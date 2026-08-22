@@ -1,57 +1,47 @@
-import { click, expect, given, role, scene, text } from 'foldkit/scene'
+import { Option } from 'effect'
+import { Command, click, expect, given, role, scene, text } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
-import { type Model, update, view } from './main'
+import { GenerateSongIds, NavigateInternal, SaveLibrary } from './command'
+import {
+  CompletedGenerateSongIds,
+  CompletedNavigateInternal,
+  SucceededSaveLibrary,
+} from './message'
+import type { Model } from './model'
+import { Editor, Home, Play } from './page'
+import { HomeRoute } from './route'
+import { Toast } from './toast'
+import { update } from './update'
+import { view } from './view'
 
-const initialModel: Model = { count: 0 }
+const emptyModel: Model = {
+  route: HomeRoute(),
+  songs: [],
+  home: Home.init()[0],
+  editor: Editor.init(Editor.placeholderSong)[0],
+  play: Play.init(Play.placeholderSong)[0],
+  toast: Toast.init({ id: 'app-toast' }),
+  maybePendingEditSongId: Option.none(),
+}
 
-describe('view', () => {
-  test('renders the initial count and three buttons', () => {
+describe('library view', () => {
+  test('empty library shows the heading and new song button', () => {
     scene(
       { update, view },
-      given(initialModel),
-      expect(text('0')).toExist(),
-      expect(role('button', { name: '+' })).toExist(),
-      expect(role('button', { name: '-' })).toExist(),
-      expect(role('button', { name: 'Reset' })).toExist(),
-    )
-  })
-
-  test('clicking + increments the displayed count', () => {
-    scene(
-      { update, view },
-      given(initialModel),
-      click(role('button', { name: '+' })),
-      expect(text('1')).toExist(),
-      click(role('button', { name: '+' })),
-      expect(text('2')).toExist(),
-    )
-  })
-
-  test('clicking - decrements the displayed count', () => {
-    scene(
-      { update, view },
-      given({ count: 3 }),
-      click(role('button', { name: '-' })),
-      expect(text('2')).toExist(),
-    )
-  })
-
-  test('clicking - past zero produces a negative count', () => {
-    scene(
-      { update, view },
-      given(initialModel),
-      click(role('button', { name: '-' })),
-      expect(text('-1')).toExist(),
-    )
-  })
-
-  test('Reset returns the count to zero', () => {
-    scene(
-      { update, view },
-      given({ count: 42 }),
-      click(role('button', { name: 'Reset' })),
-      expect(text('0')).toExist(),
+      given(emptyModel),
+      expect(role('heading', { name: 'Songbook' })).toExist(),
+      expect(role('button', { name: 'New song' })).toExist(),
+      expect(
+        text('No songs yet. Start a chart and paste lyrics while you listen.'),
+      ).toExist(),
+      click(role('button', { name: 'New song' })),
+      Command.resolve(
+        GenerateSongIds,
+        CompletedGenerateSongIds({ songId: 'song-1', sectionId: 'section-1' }),
+      ),
+      Command.resolve(SaveLibrary, SucceededSaveLibrary()),
+      Command.resolve(NavigateInternal, CompletedNavigateInternal()),
     )
   })
 })

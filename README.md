@@ -1,15 +1,29 @@
-# My Foldkit App
+# Songbook
 
-A Foldkit application built with Effect.
+A Foldkit app for writing chord charts with lyrics. Listen to a song in Spotify, Apple Music, or anywhere else, then get the chords and lyrics down here.
 
-## Getting Started
+## What it does
+
+- Keep a library of songs in this browser (`localStorage`)
+- Paste lyrics into named sections (Verse, Chorus, Bridge, …)
+- Click a word and type a chord so it sits above that word
+- Open a play view with large type, transpose, and capo (display only — stored chords stay in the original key)
+- Copy a text chart you can paste elsewhere
+
+## Run
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-## Learn More
+Then open the URL Vite prints (usually `http://localhost:5173`).
 
-- [Foldkit Documentation](https://foldkit.dev)
-- [Effect Documentation](https://effect.website)
+## Scripts
+
+```bash
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm format
+```

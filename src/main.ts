@@ -1,95 +1,76 @@
-import { Schema as S } from 'effect'
-import { Command, Runtime } from 'foldkit'
-import { Document, HtmlBuilder } from 'foldkit/html'
-import { defineMessageUnion } from 'foldkit/message'
-import { evo } from 'foldkit/struct'
+import { Effect, Match as M, Option, Schema as S } from 'effect'
+import { KeyValueStore } from 'effect/unstable/persistence'
+import { Runtime } from 'foldkit'
+import { Url } from 'foldkit/url'
 
-import { Button } from '@foldkit/ui'
+import { BrowserKeyValueStore } from '@effect/platform-browser'
 
-// MODEL
+import { SavedLibrary } from './command'
+import { STORAGE_KEY } from './constant'
+import { Song } from './domain'
+import { Message } from './message'
+import { Model } from './model'
+import { Editor, Home, Play } from './page'
+import { urlToAppRoute } from './route'
+import { Toast } from './toast'
 
-export const Model = S.Struct({ count: S.Number })
-export type Model = typeof Model.Type
+export { Message, Model }
+export { update } from './update'
+export { view } from './view'
+export { subscriptions } from './subscription'
 
-// MESSAGE
-
-export const Message = defineMessageUnion({
-  ClickedDecrement: {},
-  ClickedIncrement: {},
-  ClickedReset: {},
+export const Flags = S.Struct({
+  maybeSavedLibrary: S.Option(SavedLibrary),
 })
-export type Message = typeof Message.Type
 
-// UPDATE
+export type Flags = typeof Flags.Type
 
-export const update = (model: Model, message: Message) =>
-  Message.match<readonly [Model, ReadonlyArray<Command.Command<Message>>]>(
-    message,
-    {
-      ClickedDecrement: () => [evo(model, { count: count => count - 1 }), []],
-      ClickedIncrement: () => [evo(model, { count: count => count + 1 }), []],
-      ClickedReset: () => [evo(model, { count: () => 0 }), []],
-    },
+export const flags: Effect.Effect<Flags> = Effect.gen(function* () {
+  const store = yield* KeyValueStore.KeyValueStore
+  const json = yield* Effect.fromOption(
+    Option.fromNullishOr(yield* store.get(STORAGE_KEY)),
   )
-
-// INIT
-
-export const init: Runtime.ApplicationInit<Model, Message> = () => [
-  { count: 0 },
-  [],
-]
-
-// VIEW
-
-export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
-  title: `Counter: ${model.count}`,
-  body: h.div(
-    [
-      h.Class(
-        'min-h-screen bg-white flex flex-col items-center justify-center gap-6 p-6',
-      ),
-    ],
-    [
-      h.p(
-        [h.Class('text-6xl font-bold text-gray-800')],
-        [model.count.toString()],
-      ),
-      h.div(
-        [h.Class('flex flex-wrap justify-center gap-4')],
-        [
-          Button.view(
-            {
-              onClick: Message.ClickedDecrement(),
-              toView: attributes =>
-                h.button([...attributes.button, h.Class(buttonStyle)], ['-']),
-            },
-            h,
-          ),
-          Button.view(
-            {
-              onClick: Message.ClickedReset(),
-              toView: attributes =>
-                h.button(
-                  [...attributes.button, h.Class(buttonStyle)],
-                  ['Reset'],
-                ),
-            },
-            h,
-          ),
-          Button.view(
-            {
-              onClick: Message.ClickedIncrement(),
-              toView: attributes =>
-                h.button([...attributes.button, h.Class(buttonStyle)], ['+']),
-            },
-            h,
-          ),
-        ],
-      ),
-    ],
+  const decoded = yield* S.decodeEffect(S.fromJsonString(SavedLibrary))(json)
+  return Flags.make({ maybeSavedLibrary: Option.some(decoded) })
+}).pipe(
+  Effect.catch(() =>
+    Effect.succeed(Flags.make({ maybeSavedLibrary: Option.none() })),
   ),
-})
+  Effect.provide(BrowserKeyValueStore.layerLocalStorage),
+)
 
-// STYLE
+export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
+  flags,
+  url: Url,
+) => {
+  const route = urlToAppRoute(url)
+  const songs = Option.match(flags.maybeSavedLibrary, {
+    onNone: () => [],
+    onSome: ({ songs }) => songs,
+  })
+  const [home] = Home.init()
+  const maybeCurrentSong = M.value(route).pipe(
+    M.tag('SongEdit', ({ songId }) => Song.findById(songs, songId)),
+    M.tag('SongPlay', ({ songId }) => Song.findById(songs, songId)),
+    M.orElse(() => Option.none()),
+  )
+  const currentSong = Option.getOrElse(
+    maybeCurrentSong,
+    () => Editor.placeholderSong,
+  )
+  const [editor] = Editor.init(currentSong)
+  const [play] = Play.init(currentSong)
 
-const buttonStyle = 'bg-black text-white hover:bg-gray-700 px-4 py-2 transition'
+  return [
+    {
+      route,
+      songs,
+      home,
+      editor,
+      play,
+      toast: Toast.init({ id: 'app-toast' }),
+      maybePendingEditSongId: Option.none(),
+    },
+    [],
+  ]
+}

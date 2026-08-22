@@ -15,6 +15,7 @@
     "@effect/platform-browser": "4.0.0-rc.109",
     "@foldkit/ui": "^0.148.2",
     "@tailwindcss/vite": "^4.3.1",
+    "clsx": "^2.1.1",
     "effect": "4.0.0-rc.109",
     "foldkit": "^0.148.2",
     "tailwindcss": "^4.3.1"
