@@ -13,18 +13,18 @@
   },
   "dependencies": {
     "@effect/platform-browser": "4.0.0-rc.109",
-    "@foldkit/ui": "^0.148.2",
+    "@foldkit/ui": "^0.149.0",
     "@tailwindcss/vite": "^4.3.1",
     "clsx": "^2.1.1",
     "effect": "4.0.0-rc.109",
-    "foldkit": "^0.148.2",
+    "foldkit": "^0.149.0",
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
-    "@foldkit/devtools": "^0.148.2",
+    "@foldkit/devtools": "^0.149.0",
     "@foldkit/devtools-mcp": "^0.16.1",
-    "@foldkit/oxlint-plugin": "^0.6.0",
-    "@foldkit/vite-plugin": "^0.16.1",
+    "@foldkit/oxlint-plugin": "^0.7.0",
+    "@foldkit/vite-plugin": "^0.16.2",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "happy-dom": "^20.10.4",
     "oxlint": "^1.79.0",

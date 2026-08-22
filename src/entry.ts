@@ -10,7 +10,6 @@ import {
   update,
   view,
 } from './main'
-import { ChangedUrl, ClickedLink } from './message'
 
 const application = Runtime.makeApplication({
   Model,
@@ -21,8 +20,8 @@ const application = Runtime.makeApplication({
   subscriptions,
   container: document.getElementById('root'),
   routing: {
-    onUrlRequest: request => ClickedLink({ request }),
-    onUrlChange: url => ChangedUrl({ url }),
+    onUrlRequest: request => Message.ClickedLink({ request }),
+    onUrlChange: url => Message.ChangedUrl({ url }),
   },
   devTools: {
     Message,

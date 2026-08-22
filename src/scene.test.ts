@@ -3,11 +3,7 @@ import { Command, click, expect, given, role, scene, text } from 'foldkit/scene'
 import { describe, test } from 'vitest'
 
 import { GenerateSongIds, NavigateInternal, SaveLibrary } from './command'
-import {
-  CompletedGenerateSongIds,
-  CompletedNavigateInternal,
-  SucceededSaveLibrary,
-} from './message'
+import { Message } from './message'
 import type { Model } from './model'
 import { Editor, Home, Play } from './page'
 import { HomeRoute } from './route'
@@ -38,10 +34,13 @@ describe('library view', () => {
       click(role('button', { name: 'New song' })),
       Command.resolve(
         GenerateSongIds,
-        CompletedGenerateSongIds({ songId: 'song-1', sectionId: 'section-1' }),
+        Message.CompletedGenerateSongIds({
+          songId: 'song-1',
+          sectionId: 'section-1',
+        }),
       ),
-      Command.resolve(SaveLibrary, SucceededSaveLibrary()),
-      Command.resolve(NavigateInternal, CompletedNavigateInternal()),
+      Command.resolve(SaveLibrary, Message.SucceededSaveLibrary()),
+      Command.resolve(NavigateInternal, Message.CompletedNavigateInternal()),
     )
   })
 })

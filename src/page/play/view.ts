@@ -7,16 +7,13 @@ import { Button } from '@foldkit/ui'
 import { Song } from '../../domain'
 import { homeRouter, songEditRouter } from '../../route'
 import * as className from '../../view/className'
-import * as Message from './message'
+import { Message } from './message'
 import { Model } from './model'
 
 const formatSigned = (value: number): string =>
   value > 0 ? `+${String(value)}` : String(value)
 
-const metaLineView = (
-  song: Song.Song,
-  h: HtmlBuilder<Message.Message>,
-): Html => {
+const metaLineView = (song: Song.Song, h: HtmlBuilder<Message>): Html => {
   const keyText = Option.match(song.maybeOriginalKey, {
     onNone: () => '',
     onSome: key => `Key ${key}`,
@@ -38,7 +35,7 @@ const metaLineView = (
   })
 }
 
-const controlsView = (h: HtmlBuilder<Message.Message>): Html =>
+const controlsView = (h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex flex-wrap gap-2')],
     [
@@ -100,7 +97,7 @@ const controlsView = (h: HtmlBuilder<Message.Message>): Html =>
     ],
   )
 
-export const view = Submodel.defineView<Model, Message.Message>((model, h) =>
+export const view = Submodel.defineView<Model, Message>((model, h) =>
   h.main(
     [h.Class('flex flex-col gap-8')],
     [

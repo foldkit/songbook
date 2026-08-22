@@ -11,14 +11,7 @@ import { describe, expect, test } from 'vitest'
 
 import { Line, Song } from '../../domain'
 import { CopyChart } from './command'
-import {
-  ClickedCapoUp,
-  ClickedCopyChart,
-  ClickedTransposeUp,
-  FailedCopyChart,
-  SucceededCopyChart,
-  UpdatedSong,
-} from './message'
+import { Message, OutMessage } from './message'
 import { init } from './model'
 import { update } from './update'
 
@@ -44,14 +37,16 @@ describe('play view preferences', () => {
     story(
       update,
       given(playModel),
-      message(ClickedTransposeUp()),
+      message(Message.ClickedTransposeUp()),
       model(current => {
         expect(current.song.transpose).toBe(1)
         expect(current.song.sections[0]?.lines[0]?.marks[0]?.name).toBe('G')
         expect(Song.toChartText(current.song)).toContain('G#')
       }),
       expectOutMessage(
-        UpdatedSong({ song: evo(base, { transpose: () => 1 }) }),
+        OutMessage.UpdatedSong({
+          song: evo(base, { transpose: () => 1 }),
+        }),
       ),
     )
   })
@@ -60,12 +55,14 @@ describe('play view preferences', () => {
     story(
       update,
       given(playModel),
-      message(ClickedCapoUp()),
+      message(Message.ClickedCapoUp()),
       model(current => {
         expect(current.song.capo).toBe(1)
         expect(Song.toChartText(current.song)).toContain('F#')
       }),
-      expectOutMessage(UpdatedSong({ song: evo(base, { capo: () => 1 }) })),
+      expectOutMessage(
+        OutMessage.UpdatedSong({ song: evo(base, { capo: () => 1 }) }),
+      ),
     )
   })
 
@@ -73,9 +70,9 @@ describe('play view preferences', () => {
     story(
       update,
       given(playModel),
-      message(ClickedCopyChart()),
+      message(Message.ClickedCopyChart()),
       Command.expectExact(CopyChart({ text: Song.toChartText(base) })),
-      Command.resolve(CopyChart, SucceededCopyChart()),
+      Command.resolve(CopyChart, Message.SucceededCopyChart()),
     )
   })
 
@@ -83,10 +80,10 @@ describe('play view preferences', () => {
     story(
       update,
       given(playModel),
-      message(ClickedCopyChart()),
+      message(Message.ClickedCopyChart()),
       Command.resolve(
         CopyChart,
-        FailedCopyChart({ error: 'Could not copy the chart.' }),
+        Message.FailedCopyChart({ error: 'Could not copy the chart.' }),
       ),
     )
   })

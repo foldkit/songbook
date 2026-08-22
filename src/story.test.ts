@@ -4,15 +4,9 @@ import { describe, expect, test } from 'vitest'
 
 import { GenerateSongIds, NavigateInternal, SaveLibrary } from './command'
 import { Song } from './domain'
-import {
-  CompletedGenerateSongIds,
-  CompletedNavigateInternal,
-  GotHomeMessage,
-  SucceededSaveLibrary,
-} from './message'
+import { Message } from './message'
 import type { Model } from './model'
 import { Editor, Home, Play } from './page'
-import { ClickedNewSong } from './page/home/message'
 import { HomeRoute, songEditRouter } from './route'
 import { Toast } from './toast'
 import { update } from './update'
@@ -36,11 +30,13 @@ describe('library', () => {
     story(
       update,
       given(emptyModel),
-      message(GotHomeMessage({ message: ClickedNewSong() })),
+      message(
+        Message.GotHomeMessage({ message: Home.Message.ClickedNewSong() }),
+      ),
       Command.expectExact(GenerateSongIds()),
       Command.resolve(
         GenerateSongIds,
-        CompletedGenerateSongIds({ songId, sectionId }),
+        Message.CompletedGenerateSongIds({ songId, sectionId }),
       ),
       model(current => {
         expect(current.songs).toHaveLength(1)
@@ -48,11 +44,11 @@ describe('library', () => {
         expect(current.editor.song.id).toBe(songId)
       }),
       Command.expectExact(SaveLibrary({ songs: [created] })),
-      Command.resolve(SaveLibrary, SucceededSaveLibrary()),
+      Command.resolve(SaveLibrary, Message.SucceededSaveLibrary()),
       Command.expectExact(
         NavigateInternal({ url: songEditRouter({ songId }) }),
       ),
-      Command.resolve(NavigateInternal, CompletedNavigateInternal()),
+      Command.resolve(NavigateInternal, Message.CompletedNavigateInternal()),
     )
   })
 })

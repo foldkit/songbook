@@ -2,13 +2,7 @@ import { Match as M, Option } from 'effect'
 import type { Document, Html, HtmlBuilder } from 'foldkit/html'
 
 import { Song } from './domain'
-import {
-  GotEditorMessage,
-  GotHomeMessage,
-  GotPlayMessage,
-  GotToastMessage,
-  type Message,
-} from './message'
+import { Message } from './message'
 import { Model } from './model'
 import { notFoundView } from './notFoundView'
 import { Editor, Home, Play } from './page'
@@ -68,7 +62,7 @@ const toastView = (model: Model, h: HtmlBuilder<Message>): Html =>
           ],
         ),
     },
-    toParentMessage: message => GotToastMessage({ message }),
+    toParentMessage: message => Message.GotToastMessage({ message }),
   })
 
 const homePageView = (model: Model, h: HtmlBuilder<Message>): Html =>
@@ -77,7 +71,7 @@ const homePageView = (model: Model, h: HtmlBuilder<Message>): Html =>
     model: model.home,
     view: Home.view,
     viewInputs: { songs: model.songs },
-    toParentMessage: message => GotHomeMessage({ message }),
+    toParentMessage: message => Message.GotHomeMessage({ message }),
   })
 
 const editorPageView = (model: Model, h: HtmlBuilder<Message>): Html =>
@@ -85,7 +79,7 @@ const editorPageView = (model: Model, h: HtmlBuilder<Message>): Html =>
     slotId: 'editor',
     model: model.editor,
     view: Editor.view,
-    toParentMessage: message => GotEditorMessage({ message }),
+    toParentMessage: message => Message.GotEditorMessage({ message }),
   })
 
 const playPageView = (model: Model, h: HtmlBuilder<Message>): Html =>
@@ -93,7 +87,7 @@ const playPageView = (model: Model, h: HtmlBuilder<Message>): Html =>
     slotId: 'play',
     model: model.play,
     view: Play.view,
-    toParentMessage: message => GotPlayMessage({ message }),
+    toParentMessage: message => Message.GotPlayMessage({ message }),
   })
 
 const missingSongView = (h: HtmlBuilder<Message>): Html =>

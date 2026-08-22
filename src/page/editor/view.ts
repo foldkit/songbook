@@ -22,7 +22,7 @@ import {
   lyricsDraft,
   maybePlacingChord,
 } from './lineView'
-import * as Message from './message'
+import { Message } from './message'
 import { Model } from './model'
 
 const AddSectionMenu = Menu.create<Section.SectionKind>()
@@ -33,7 +33,7 @@ const MENU_ANCHOR = {
   padding: 8,
 }
 
-const metadataView = (song: Song.Song, h: HtmlBuilder<Message.Message>): Html =>
+const metadataView = (song: Song.Song, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('grid gap-4 sm:grid-cols-3')],
     [
@@ -69,10 +69,7 @@ const metadataView = (song: Song.Song, h: HtmlBuilder<Message.Message>): Html =>
     ],
   )
 
-const lyricsEditorView = (
-  draft: string,
-  h: HtmlBuilder<Message.Message>,
-): Html =>
+const lyricsEditorView = (draft: string, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex flex-col gap-3')],
     [
@@ -117,7 +114,7 @@ const lyricsEditorView = (
     ],
   )
 
-const emptySectionBodyView = (h: HtmlBuilder<Message.Message>): Html =>
+const emptySectionBodyView = (h: HtmlBuilder<Message>): Html =>
   h.p(
     [h.Class('text-sm text-stone-500')],
     ['No lyrics yet. Edit lyrics and paste while you listen.'],
@@ -126,7 +123,7 @@ const emptySectionBodyView = (h: HtmlBuilder<Message.Message>): Html =>
 const chordLinesView = (
   section: Section.Section,
   model: Model,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html =>
   Array.match(section.lines, {
     onEmpty: () => emptySectionBodyView(h),
@@ -146,7 +143,7 @@ const chordLinesView = (
 const sectionBodyView = (
   section: Section.Section,
   model: Model,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html =>
   isEditingSection(model, section.id)
     ? lyricsEditorView(lyricsDraft(model), h)
@@ -155,7 +152,7 @@ const sectionBodyView = (
 const sectionActionsView = (
   section: Section.Section,
   canRemove: boolean,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html =>
   h.div(
     [h.Class('flex flex-wrap gap-2')],
@@ -203,7 +200,7 @@ const sectionView = (
   section: Section.Section,
   index: number,
   canRemove: boolean,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html => {
   const isThisSectionDragged = Option.exists(
     DragAndDrop.maybeDraggedItemId(model.sectionDragAndDrop),
@@ -255,10 +252,7 @@ const sectionView = (
   )
 }
 
-const addSectionMenuView = (
-  model: Model,
-  h: HtmlBuilder<Message.Message>,
-): Html =>
+const addSectionMenuView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('relative')],
     [
@@ -291,10 +285,7 @@ const addSectionMenuView = (
     ],
   )
 
-const deleteSectionDialogView = (
-  model: Model,
-  h: HtmlBuilder<Message.Message>,
-): Html =>
+const deleteSectionDialogView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.submodel({
     slotId: model.deleteSectionDialog.id,
     model: model.deleteSectionDialog,
@@ -378,10 +369,7 @@ const deleteSectionDialogView = (
       Message.GotDeleteSectionDialogMessage({ message }),
   })
 
-const ghostSectionView = (
-  model: Model,
-  h: HtmlBuilder<Message.Message>,
-): Html =>
+const ghostSectionView = (model: Model, h: HtmlBuilder<Message>): Html =>
   Option.match(
     Option.flatMap(
       DragAndDrop.ghostStyle(model.sectionDragAndDrop),
@@ -413,7 +401,7 @@ const ghostSectionView = (
     },
   )
 
-export const view = Submodel.defineView<Model, Message.Message>((model, h) => {
+export const view = Submodel.defineView<Model, Message>((model, h) => {
   const canRemove = Array.match(Array.drop(model.song.sections, 1), {
     onEmpty: () => false,
     onNonEmpty: () => true,

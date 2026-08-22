@@ -9,14 +9,14 @@ import { Song } from '../../domain'
 import { songEditRouter, songPlayRouter } from '../../route'
 import * as className from '../../view/className'
 import { labeledInput } from '../../view/field'
-import * as Message from './message'
+import { Message } from './message'
 import { Model } from './model'
 
 export type ViewInputs = Readonly<{
   songs: ReadonlyArray<Song.Song>
 }>
 
-const emptyLibraryView = (h: HtmlBuilder<Message.Message>): Html =>
+const emptyLibraryView = (h: HtmlBuilder<Message>): Html =>
   h.div(
     [
       h.Class(
@@ -31,10 +31,10 @@ const emptyLibraryView = (h: HtmlBuilder<Message.Message>): Html =>
     ],
   )
 
-const noMatchesView = (h: HtmlBuilder<Message.Message>): Html =>
+const noMatchesView = (h: HtmlBuilder<Message>): Html =>
   h.p([h.Class('text-stone-600')], ['No songs match that search.'])
 
-const songRowView = (song: Song.Song, h: HtmlBuilder<Message.Message>): Html =>
+const songRowView = (song: Song.Song, h: HtmlBuilder<Message>): Html =>
   h.keyed('li')(
     song.id,
     [h.Class(className.songCard)],
@@ -84,7 +84,7 @@ const songRowView = (song: Song.Song, h: HtmlBuilder<Message.Message>): Html =>
 
 const songListView = (
   songs: ReadonlyArray<Song.Song>,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html =>
   h.ul(
     [h.Class('flex flex-col gap-3'), h.AriaLabel('Songs')],
@@ -94,7 +94,7 @@ const songListView = (
 const libraryBodyView = (
   allSongs: ReadonlyArray<Song.Song>,
   visibleSongs: ReadonlyArray<Song.Song>,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html =>
   Array.match(allSongs, {
     onEmpty: () => emptyLibraryView(h),
@@ -105,10 +105,7 @@ const libraryBodyView = (
       }),
   })
 
-const deleteDialogView = (
-  model: Model,
-  h: HtmlBuilder<Message.Message>,
-): Html =>
+const deleteDialogView = (model: Model, h: HtmlBuilder<Message>): Html =>
   h.submodel({
     slotId: model.deleteDialog.id,
     model: model.deleteDialog,
@@ -191,7 +188,7 @@ const deleteDialogView = (
     toParentMessage: message => Message.GotDeleteDialogMessage({ message }),
   })
 
-export const view = Submodel.defineView<Model, Message.Message, ViewInputs>(
+export const view = Submodel.defineView<Model, Message, ViewInputs>(
   (model, viewInputs, h) => {
     const visibleSongs = Song.filterByQuery(viewInputs.songs, model.searchQuery)
 

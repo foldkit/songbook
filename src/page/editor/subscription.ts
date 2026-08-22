@@ -2,7 +2,7 @@ import { Subscription } from 'foldkit'
 
 import { DragAndDrop } from '@foldkit/ui'
 
-import { GotSectionDragAndDropMessage, type Message } from './message'
+import { Message } from './message'
 import { Model } from './model'
 
 export const subscriptions = Subscription.lift({
@@ -12,5 +12,5 @@ export const subscriptions = Subscription.lift({
   autoScroll: DragAndDrop.subscriptions.autoScroll,
 })<Model, Message>({
   toChildModel: model => model.sectionDragAndDrop,
-  toParentMessage: message => GotSectionDragAndDropMessage({ message }),
+  toParentMessage: message => Message.GotSectionDragAndDropMessage({ message }),
 })

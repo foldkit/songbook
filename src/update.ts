@@ -10,13 +10,7 @@ import {
   SaveLibrary,
 } from './command'
 import { Song } from './domain'
-import {
-  GotEditorMessage,
-  GotHomeMessage,
-  GotPlayMessage,
-  GotToastMessage,
-  type Message,
-} from './message'
+import { Message } from './message'
 import { Model } from './model'
 import { Editor, Home, Play } from './page'
 import { songEditRouter, urlToAppRoute } from './route'
@@ -43,7 +37,7 @@ const showToast =
     return [
       evo(model, { toast: () => nextToast }),
       Command.mapMessages(toastCommands, message =>
-        GotToastMessage({ message }),
+        Message.GotToastMessage({ message }),
       ),
     ]
   }
@@ -51,36 +45,33 @@ const showToast =
 const foldHomeOutMessage = (
   outMessage: Home.OutMessage,
 ): Update.Step<Model, Message> =>
-  M.value(outMessage).pipe(
-    M.withReturnType<Update.Step<Model, Message>>(),
-    M.tagsExhaustive({
-      RequestedNewSong: () => model => [model, [GenerateSongIds()]],
-      ConfirmedDeleteSong:
-        ({ songId }) =>
-        model => {
-          const songs = Song.remove(model.songs, songId)
-          const editor =
-            model.editor.song.id === songId
-              ? Editor.init(Editor.placeholderSong)[0]
-              : model.editor
-          const play =
-            model.play.song.id === songId
-              ? Play.init(Play.placeholderSong)[0]
-              : model.play
+  Home.OutMessage.match<Update.Step<Model, Message>>(outMessage, {
+    RequestedNewSong: () => model => [model, [GenerateSongIds()]],
+    ConfirmedDeleteSong:
+      ({ songId }) =>
+      model => {
+        const songs = Song.remove(model.songs, songId)
+        const editor =
+          model.editor.song.id === songId
+            ? Editor.init(Editor.placeholderSong)[0]
+            : model.editor
+        const play =
+          model.play.song.id === songId
+            ? Play.init(Play.placeholderSong)[0]
+            : model.play
 
-          return Update.combine(
-            evo(model, { editor: () => editor, play: () => play }),
-            [saveSongs(songs)],
-          )
-        },
-    }),
-  )
+        return Update.combine(
+          evo(model, { editor: () => editor, play: () => play }),
+          [saveSongs(songs)],
+        )
+      },
+  })
 
 const foldHome = Update.foldChild({
   update: Home.update,
   read: (model: Model) => Option.some(model.home),
   write: (model, nextHome) => evo(model, { home: () => nextHome }),
-  toParentMessage: message => GotHomeMessage({ message }),
+  toParentMessage: message => Message.GotHomeMessage({ message }),
   foldOutMessage: foldHomeOutMessage,
 })
 
@@ -106,38 +97,32 @@ const syncSong =
 const foldEditorOutMessage = (
   outMessage: Editor.OutMessage,
 ): Update.Step<Model, Message> =>
-  M.value(outMessage).pipe(
-    M.withReturnType<Update.Step<Model, Message>>(),
-    M.tagsExhaustive({
-      UpdatedSong: ({ song }) => syncSong(song),
-    }),
-  )
+  Editor.OutMessage.match<Update.Step<Model, Message>>(outMessage, {
+    UpdatedSong: ({ song }) => syncSong(song),
+  })
 
 const foldEditor = Update.foldChild({
   update: Editor.update,
   read: (model: Model) => Option.some(model.editor),
   write: (model, nextEditor) => evo(model, { editor: () => nextEditor }),
-  toParentMessage: message => GotEditorMessage({ message }),
+  toParentMessage: message => Message.GotEditorMessage({ message }),
   foldOutMessage: foldEditorOutMessage,
 })
 
 const foldPlayOutMessage = (
   outMessage: Play.OutMessage,
 ): Update.Step<Model, Message> =>
-  M.value(outMessage).pipe(
-    M.withReturnType<Update.Step<Model, Message>>(),
-    M.tagsExhaustive({
-      UpdatedSong: ({ song }) => syncSong(song),
-      CopiedChart: () => showToast('Success', 'Chart copied'),
-      FailedCopy: ({ error }) => showToast('Error', error),
-    }),
-  )
+  Play.OutMessage.match<Update.Step<Model, Message>>(outMessage, {
+    UpdatedSong: ({ song }) => syncSong(song),
+    CopiedChart: () => showToast('Success', 'Chart copied'),
+    FailedCopy: ({ error }) => showToast('Error', error),
+  })
 
 const foldPlay = Update.foldChild({
   update: Play.update,
   read: (model: Model) => Option.some(model.play),
   write: (model, nextPlay) => evo(model, { play: () => nextPlay }),
-  toParentMessage: message => GotPlayMessage({ message }),
+  toParentMessage: message => Message.GotPlayMessage({ message }),
   foldOutMessage: foldPlayOutMessage,
 })
 
@@ -145,7 +130,7 @@ const foldToast = Update.foldChild({
   update: Toast.update,
   read: (model: Model) => Option.some(model.toast),
   write: (model, nextToast) => evo(model, { toast: () => nextToast }),
-  toParentMessage: message => GotToastMessage({ message }),
+  toParentMessage: message => Message.GotToastMessage({ message }),
   foldOutMessage: () => model => [model, []],
 })
 
@@ -178,58 +163,55 @@ const setRoute =
   }
 
 export const update = (model: Model, message: Message) =>
-  M.value(message).pipe(
-    withUpdateReturn,
-    M.tagsExhaustive({
-      ClickedLink: ({ request }) =>
-        M.value(request).pipe(
-          withUpdateReturn,
-          M.tagsExhaustive({
-            Internal: ({ url }) => [
-              model,
-              [NavigateInternal({ url: urlToString(url) })],
-            ],
-            External: ({ href }) => [model, [LoadExternal({ href })]],
-          }),
-        ),
-
-      ChangedUrl: ({ url }) => setRoute(url)(model),
-
-      CompletedNavigateInternal: () => [model, []],
-      CompletedLoadExternal: () => [model, []],
-
-      CompletedGenerateSongIds: ({ songId, sectionId }) => {
-        const song = Song.create(songId, sectionId)
-        const [editor] = Editor.init(song)
-        const [play] = Play.init(song)
-        return Update.combine(
-          evo(model, {
-            editor: () => editor,
-            play: () => play,
-            maybePendingEditSongId: () => Option.some(songId),
-          }),
-          [saveSongs(Song.upsert(model.songs, song))],
-        )
-      },
-
-      SucceededSaveLibrary: () =>
-        Option.match(model.maybePendingEditSongId, {
-          onNone: () => [model, []],
-          onSome: songId => [
-            evo(model, { maybePendingEditSongId: () => Option.none() }),
-            [NavigateInternal({ url: songEditRouter({ songId }) })],
+  Message.match<UpdateReturn>(message, {
+    ClickedLink: ({ request }) =>
+      M.value(request).pipe(
+        withUpdateReturn,
+        M.tagsExhaustive({
+          Internal: ({ url }) => [
+            model,
+            [NavigateInternal({ url: urlToString(url) })],
           ],
+          External: ({ href }) => [model, [LoadExternal({ href })]],
         }),
+      ),
 
-      FailedSaveLibrary: ({ error }) =>
-        Update.combine(
+    ChangedUrl: ({ url }) => setRoute(url)(model),
+
+    CompletedNavigateInternal: () => [model, []],
+    CompletedLoadExternal: () => [model, []],
+
+    CompletedGenerateSongIds: ({ songId, sectionId }) => {
+      const song = Song.create(songId, sectionId)
+      const [editor] = Editor.init(song)
+      const [play] = Play.init(song)
+      return Update.combine(
+        evo(model, {
+          editor: () => editor,
+          play: () => play,
+          maybePendingEditSongId: () => Option.some(songId),
+        }),
+        [saveSongs(Song.upsert(model.songs, song))],
+      )
+    },
+
+    SucceededSaveLibrary: () =>
+      Option.match(model.maybePendingEditSongId, {
+        onNone: () => [model, []],
+        onSome: songId => [
           evo(model, { maybePendingEditSongId: () => Option.none() }),
-          [showToast('Error', error)],
-        ),
+          [NavigateInternal({ url: songEditRouter({ songId }) })],
+        ],
+      }),
 
-      GotHomeMessage: ({ message }) => foldHome(model, message),
-      GotEditorMessage: ({ message }) => foldEditor(model, message),
-      GotPlayMessage: ({ message }) => foldPlay(model, message),
-      GotToastMessage: ({ message }) => foldToast(model, message),
-    }),
-  )
+    FailedSaveLibrary: ({ error }) =>
+      Update.combine(
+        evo(model, { maybePendingEditSongId: () => Option.none() }),
+        [showToast('Error', error)],
+      ),
+
+    GotHomeMessage: ({ message }) => foldHome(model, message),
+    GotEditorMessage: ({ message }) => foldEditor(model, message),
+    GotPlayMessage: ({ message }) => foldPlay(model, message),
+    GotToastMessage: ({ message }) => foldToast(model, message),
+  })

@@ -6,10 +6,10 @@ import { Button, Input } from '@foldkit/ui'
 import { CHORD_DRAFT_INPUT_ID } from '../../constant'
 import { Line } from '../../domain'
 import * as className from '../../view/className'
-import * as Message from './message'
+import { Message } from './message'
 import type { Model, PlacingChord } from './model'
 
-const chordDraftKeyMessage = (key: string): Option.Option<Message.Message> =>
+const chordDraftKeyMessage = (key: string): Option.Option<Message> =>
   M.value(key).pipe(
     M.when('Escape', () => Message.PressedCancelChord()),
     M.when('Enter', () => Message.PressedCommitChord()),
@@ -30,7 +30,7 @@ const chordSlotView = (
   line: Line.LyricLine,
   word: Line.Word,
   maybePlacing: Option.Option<PlacingChord>,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html => {
   if (isPlacingOnWord(maybePlacing, line.id, word.start)) {
     const draft = Option.match(maybePlacing, {
@@ -96,7 +96,7 @@ const chordSlotView = (
 const wordButtonView = (
   line: Line.LyricLine,
   word: Line.Word,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html =>
   Button.view(
     {
@@ -117,7 +117,7 @@ const wordButtonView = (
 export const lineView = (
   line: Line.LyricLine,
   maybePlacing: Option.Option<PlacingChord>,
-  h: HtmlBuilder<Message.Message>,
+  h: HtmlBuilder<Message>,
 ): Html =>
   Array.match(Line.words(line.lyric), {
     onEmpty: () =>

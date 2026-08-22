@@ -1,6 +1,6 @@
 import { Subscription } from 'foldkit'
 
-import { GotEditorMessage, type Message } from './message'
+import { Message } from './message'
 import { Model } from './model'
 import { Editor } from './page'
 
@@ -9,6 +9,6 @@ export const subscriptions = Subscription.lift(Editor.subscriptions)<
   Message
 >({
   toChildModel: model => model.editor,
-  toParentMessage: message => GotEditorMessage({ message }),
+  toParentMessage: message => Message.GotEditorMessage({ message }),
   when: ({ route }) => route._tag === 'SongEdit',
 })

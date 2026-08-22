@@ -7,13 +7,7 @@ import { BrowserCrypto, BrowserKeyValueStore } from '@effect/platform-browser'
 
 import { STORAGE_KEY } from './constant'
 import { Song } from './domain'
-import {
-  CompletedGenerateSongIds,
-  CompletedLoadExternal,
-  CompletedNavigateInternal,
-  FailedSaveLibrary,
-  SucceededSaveLibrary,
-} from './message'
+import { Message } from './message'
 
 export const SavedLibrary = S.Struct({
   songs: S.Array(Song.Song),
@@ -22,18 +16,18 @@ export const SavedLibrary = S.Struct({
 export type SavedLibrary = typeof SavedLibrary.Type
 
 export const GenerateSongIds = Command.define('GenerateSongIds', {
-  messages: [CompletedGenerateSongIds],
+  messages: [Message.CompletedGenerateSongIds],
   execute: Effect.gen(function* () {
     const crypto = yield* Crypto.Crypto
     const songId = yield* Effect.orDie(crypto.randomUUIDv4)
     const sectionId = yield* Effect.orDie(crypto.randomUUIDv4)
-    return CompletedGenerateSongIds({ songId, sectionId })
+    return Message.CompletedGenerateSongIds({ songId, sectionId })
   }).pipe(Effect.provide(BrowserCrypto.layer)),
 })
 
 export const SaveLibrary = Command.define('SaveLibrary', {
   args: { songs: S.Array(Song.Song) },
-  messages: [SucceededSaveLibrary, FailedSaveLibrary],
+  messages: [Message.SucceededSaveLibrary, Message.FailedSaveLibrary],
   execute: ({ songs }) =>
     Effect.gen(function* () {
       const store = yield* KeyValueStore.KeyValueStore
@@ -41,11 +35,11 @@ export const SaveLibrary = Command.define('SaveLibrary', {
         STORAGE_KEY,
         S.encodeSync(S.fromJsonString(SavedLibrary))({ songs }),
       )
-      return SucceededSaveLibrary()
+      return Message.SucceededSaveLibrary()
     }).pipe(
       Effect.catch(() =>
         Effect.succeed(
-          FailedSaveLibrary({ error: 'Could not save your songs.' }),
+          Message.FailedSaveLibrary({ error: 'Could not save your songs.' }),
         ),
       ),
       Effect.provide(BrowserKeyValueStore.layerLocalStorage),
@@ -54,13 +48,14 @@ export const SaveLibrary = Command.define('SaveLibrary', {
 
 export const NavigateInternal = Command.define('NavigateInternal', {
   args: { url: S.String },
-  messages: [CompletedNavigateInternal],
+  messages: [Message.CompletedNavigateInternal],
   execute: ({ url }) =>
-    pushUrl(url).pipe(Effect.as(CompletedNavigateInternal())),
+    pushUrl(url).pipe(Effect.as(Message.CompletedNavigateInternal())),
 })
 
 export const LoadExternal = Command.define('LoadExternal', {
   args: { href: S.String },
-  messages: [CompletedLoadExternal],
-  execute: ({ href }) => load(href).pipe(Effect.as(CompletedLoadExternal())),
+  messages: [Message.CompletedLoadExternal],
+  execute: ({ href }) =>
+    load(href).pipe(Effect.as(Message.CompletedLoadExternal())),
 })

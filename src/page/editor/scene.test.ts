@@ -12,7 +12,7 @@ import { describe, test } from 'vitest'
 
 import { Line, Song } from '../../domain'
 import { FocusChordDraft } from './command'
-import { CompletedFocusChordDraft } from './message'
+import { Message } from './message'
 import { init } from './model'
 import { update } from './update'
 import { view } from './view'
@@ -36,7 +36,7 @@ describe('editor view', () => {
       expect(role('heading', { name: 'Untitled' })).toExist(),
       expect(role('button', { name: 'Place chord on Hello' })).toExist(),
       click(role('button', { name: 'Place chord on Hello' })),
-      Command.resolve(FocusChordDraft, CompletedFocusChordDraft()),
+      Command.resolve(FocusChordDraft, Message.CompletedFocusChordDraft()),
       expect(label('Chord on Hello')).toExist(),
     )
   })

@@ -12,12 +12,7 @@ import { describe, expect, test } from 'vitest'
 
 import { Line, Song } from '../../domain'
 import { FocusChordDraft } from './command'
-import {
-  ClickedWord,
-  CompletedFocusChordDraft,
-  UpdatedSong,
-  UpdatedTitle,
-} from './message'
+import { Message, OutMessage } from './message'
 import { init } from './model'
 import { update } from './update'
 
@@ -35,9 +30,11 @@ describe('editor', () => {
     story(
       update,
       given(editorModel),
-      message(UpdatedTitle({ value: 'Blackbird' })),
+      message(Message.UpdatedTitle({ value: 'Blackbird' })),
       expectOutMessage(
-        UpdatedSong({ song: evo(song, { title: () => 'Blackbird' }) }),
+        OutMessage.UpdatedSong({
+          song: evo(song, { title: () => 'Blackbird' }),
+        }),
       ),
       model(current => {
         expect(current.song.title).toBe('Blackbird')
@@ -49,9 +46,9 @@ describe('editor', () => {
     story(
       update,
       given(editorModel),
-      message(ClickedWord({ lineId: 'line-1', at: 0 })),
+      message(Message.ClickedWord({ lineId: 'line-1', at: 0 })),
       Command.expectExact(FocusChordDraft()),
-      Command.resolve(FocusChordDraft, CompletedFocusChordDraft()),
+      Command.resolve(FocusChordDraft, Message.CompletedFocusChordDraft()),
       expectNoOutMessage(),
       model(current => {
         expect(current.mode._tag).toBe('PlacingChord')
