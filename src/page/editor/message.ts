@@ -15,16 +15,11 @@ export const NewMarkRequest = ts('NewMark', {
   at: S.Number,
   name: S.String,
 })
-export const ReplaceLyricsRequest = ts('ReplaceLyrics', {
-  sectionId: S.String,
-  draft: S.String,
-})
 
 export const IdRequest = S.Union([
   NewSectionRequest,
   DuplicateSectionRequest,
   NewMarkRequest,
-  ReplaceLyricsRequest,
 ])
 
 export type IdRequest = typeof IdRequest.Type

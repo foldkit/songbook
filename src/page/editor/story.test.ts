@@ -42,6 +42,22 @@ describe('editor', () => {
     )
   })
 
+  test('typing lyrics writes them onto the song so they persist', () => {
+    const draft = 'Hello world\nFrom a song'
+
+    story(
+      update,
+      given(editorModel),
+      message(Message.ClickedEditLyrics({ sectionId: 'section-1' })),
+      expectNoOutMessage(),
+      message(Message.UpdatedLyricsDraft({ value: draft })),
+      model(current => {
+        expect(current.song.sections[0]?.lines[0]?.lyric).toBe('Hello world')
+        expect(current.song.sections[0]?.lines[1]?.lyric).toBe('From a song')
+      }),
+    )
+  })
+
   test('clicking a word starts placing a chord', () => {
     story(
       update,

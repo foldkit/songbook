@@ -13,7 +13,6 @@ import {
   NewMarkRequest,
   NewSectionRequest,
   OutMessage,
-  ReplaceLyricsRequest,
 } from './message'
 import { EditingLyrics, Model, PlacingChord, Viewing } from './model'
 
@@ -181,39 +180,13 @@ const whenPlacingChord =
       M.orElse(() => [model, [], Option.none()]),
     )
 
-const handleClickedSaveLyrics = (model: Model): UpdateReturn =>
-  M.value(model.mode).pipe(
-    withUpdateReturn,
-    M.tag('EditingLyrics', ({ sectionId, draft }) =>
-      Option.match(Song.findSection(model.song, sectionId), {
-        onNone: () => [
-          evo(model, { mode: () => Viewing() }),
-          [],
-          Option.none(),
-        ],
-        onSome: section => {
-          const count = Section.countUnpreservedLines(section, draft)
-          if (count === 0) {
-            const song = Song.updateSection(model.song, sectionId, current =>
-              Section.replaceLyrics(current, draft, []),
-            )
-            return emitSong(model, song)
-          }
-
-          return [
-            model,
-            [
-              GenerateEditorIds({
-                count,
-                request: ReplaceLyricsRequest({ sectionId, draft }),
-              }),
-            ],
-            Option.none(),
-          ]
-        },
-      }),
-    ),
-    M.orElse(() => [model, [], Option.none()]),
+const applyLyricsDraft = (
+  model: Model,
+  sectionId: string,
+  draft: string,
+): Song.Song =>
+  Song.updateSection(model.song, sectionId, section =>
+    Section.replaceLyrics(section, draft),
   )
 
 const handleCompletedGenerateEditorIds =
@@ -260,12 +233,6 @@ const handleCompletedGenerateEditorIds =
               return emitSong(model, song)
             },
           }),
-        ReplaceLyrics: ({ sectionId, draft }) => {
-          const song = Song.updateSection(model.song, sectionId, section =>
-            Section.replaceLyrics(section, draft, ids),
-          )
-          return emitSong(model, song)
-        },
       }),
     )
 
@@ -295,6 +262,7 @@ export const update = (model: Model, message: Message): UpdateReturn =>
               EditingLyrics({
                 sectionId,
                 draft: Section.lyricsText(section),
+                backupLines: section.lines,
               }),
           }),
           [],
@@ -305,23 +273,45 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     UpdatedLyricsDraft: ({ value }) =>
       M.value(model.mode).pipe(
         withUpdateReturn,
-        M.tag('EditingLyrics', editing => [
-          evo(model, {
-            mode: () => evo(editing, { draft: () => value }),
-          }),
-          [],
-          Option.none(),
-        ]),
+        M.tag('EditingLyrics', editing => {
+          const song = applyLyricsDraft(model, editing.sectionId, value)
+          return [
+            evo(model, {
+              mode: () => evo(editing, { draft: () => value }),
+              song: () => song,
+            }),
+            [],
+            Option.some(OutMessage.UpdatedSong({ song })),
+          ]
+        }),
         M.orElse(() => [model, [], Option.none()]),
       ),
 
-    ClickedSaveLyrics: () => handleClickedSaveLyrics(model),
-
-    ClickedCancelLyrics: () => [
+    ClickedSaveLyrics: () => [
       evo(model, { mode: () => Viewing() }),
       [],
       Option.none(),
     ],
+
+    ClickedCancelLyrics: () =>
+      M.value(model.mode).pipe(
+        withUpdateReturn,
+        M.tag('EditingLyrics', ({ sectionId, backupLines }) => {
+          const song = Song.updateSection(model.song, sectionId, section =>
+            evo(section, { lines: () => backupLines }),
+          )
+          return [
+            evo(model, { song: () => song, mode: () => Viewing() }),
+            [],
+            Option.some(OutMessage.UpdatedSong({ song })),
+          ]
+        }),
+        M.orElse(() => [
+          evo(model, { mode: () => Viewing() }),
+          [],
+          Option.none(),
+        ]),
+      ),
 
     ClickedWord: ({ lineId, at }) => {
       const maybeMark = pipe(

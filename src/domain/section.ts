@@ -54,62 +54,24 @@ export const lyricsText = (section: Section): string =>
 
 const draftLines = (draft: string): ReadonlyArray<string> => draft.split('\n')
 
-export const countUnpreservedLines = (
-  section: Section,
-  draft: string,
-): number =>
-  pipe(
+const lineIdAt = (sectionId: string, index: number): string =>
+  `${sectionId}:${String(index)}`
+
+export const replaceLyrics = (section: Section, draft: string): Section => {
+  const lines = pipe(
     draftLines(draft),
-    Array.filter(
-      (lyric, index) =>
-        !Option.exists(
-          Array.get(section.lines, index),
-          previous => previous.lyric === lyric,
-        ),
+    Array.map((lyric, index) =>
+      Option.match(Array.get(section.lines, index), {
+        onNone: () => Line.empty(lineIdAt(section.id, index), lyric),
+        onSome: previous =>
+          previous.lyric === lyric
+            ? previous
+            : Line.empty(lineIdAt(section.id, index), lyric),
+      }),
     ),
-    Array.length,
   )
 
-type ReplaceAcc = Readonly<{
-  lines: ReadonlyArray<Line.LyricLine>
-  remainingIds: ReadonlyArray<string>
-}>
-
-export const replaceLyrics = (
-  section: Section,
-  draft: string,
-  newLineIds: ReadonlyArray<string>,
-): Section => {
-  const initial: ReplaceAcc = { lines: [], remainingIds: newLineIds }
-  const next = Array.reduce(
-    draftLines(draft),
-    initial,
-    (acc: ReplaceAcc, lyric, index): ReplaceAcc => {
-      const maybePreserved = pipe(
-        Array.get(section.lines, index),
-        Option.flatMap(previous =>
-          previous.lyric === lyric ? Option.some(previous) : Option.none(),
-        ),
-      )
-
-      return Option.match(maybePreserved, {
-        onSome: line => ({
-          lines: Array.append(acc.lines, line),
-          remainingIds: acc.remainingIds,
-        }),
-        onNone: () =>
-          Option.match(Array.head(acc.remainingIds), {
-            onNone: () => acc,
-            onSome: id => ({
-              lines: Array.append(acc.lines, Line.empty(id, lyric)),
-              remainingIds: Array.drop(acc.remainingIds, 1),
-            }),
-          }),
-      })
-    },
-  )
-
-  return evo(section, { lines: () => next.lines })
+  return evo(section, { lines: () => lines })
 }
 
 export const updateLine = (

@@ -223,26 +223,49 @@ const sectionView = (
           'border-stone-200': !isPointerDragged && !isKeyboardDragged,
         }),
       ),
-      ...DragAndDrop.draggable(
-        {
-          model: model.sectionDragAndDrop,
-          toParentMessage: message =>
-            Message.GotSectionDragAndDropMessage({ message }),
-          itemId: section.id,
-          containerId: SECTIONS_CONTAINER_ID,
-          index,
-        },
-        h,
-      ),
       ...DragAndDrop.sortable(section.id),
     ],
     [
       h.div(
         [h.Class('mb-3 flex items-center justify-between gap-2')],
         [
-          h.h2(
-            [h.Class('text-lg font-semibold text-stone-800')],
-            [Section.kindLabel(section.kind)],
+          h.div(
+            [h.Class('flex min-w-0 items-center gap-2')],
+            [
+              Button.view(
+                {
+                  toView: attributes =>
+                    h.button(
+                      [
+                        ...attributes.button,
+                        h.Class(className.dragHandle),
+                        h.AriaLabel(
+                          `Reorder ${Section.kindLabel(section.kind)}`,
+                        ),
+                        ...DragAndDrop.draggable(
+                          {
+                            model: model.sectionDragAndDrop,
+                            toParentMessage: message =>
+                              Message.GotSectionDragAndDropMessage({
+                                message,
+                              }),
+                            itemId: section.id,
+                            containerId: SECTIONS_CONTAINER_ID,
+                            index,
+                          },
+                          h,
+                        ),
+                      ],
+                      ['Move'],
+                    ),
+                },
+                h,
+              ),
+              h.h2(
+                [h.Class('text-lg font-semibold text-stone-800')],
+                [Section.kindLabel(section.kind)],
+              ),
+            ],
           ),
           sectionActionsView(section, canRemove, h),
         ],

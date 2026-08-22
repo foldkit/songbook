@@ -15,6 +15,10 @@ export const SavedLibrary = S.Struct({
 
 export type SavedLibrary = typeof SavedLibrary.Type
 
+export const SavedLibraryJsonString = S.fromJsonString(
+  S.toCodecJson(SavedLibrary),
+)
+
 export const GenerateSongIds = Command.define('GenerateSongIds', {
   messages: [Message.CompletedGenerateSongIds],
   execute: Effect.gen(function* () {
@@ -33,7 +37,7 @@ export const SaveLibrary = Command.define('SaveLibrary', {
       const store = yield* KeyValueStore.KeyValueStore
       yield* store.set(
         STORAGE_KEY,
-        S.encodeSync(S.fromJsonString(SavedLibrary))({ songs }),
+        S.encodeSync(SavedLibraryJsonString)({ songs }),
       )
       return Message.SucceededSaveLibrary()
     }).pipe(

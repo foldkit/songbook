@@ -4,12 +4,13 @@ import { ts } from 'foldkit/schema'
 import { Dialog, DragAndDrop, Menu } from '@foldkit/ui'
 
 import { PLACEHOLDER_SECTION_ID, PLACEHOLDER_SONG_ID } from '../../constant'
-import { Song } from '../../domain'
+import { Line, Song } from '../../domain'
 
 export const Viewing = ts('Viewing')
 export const EditingLyrics = ts('EditingLyrics', {
   sectionId: S.String,
   draft: S.String,
+  backupLines: S.Array(Line.LyricLine),
 })
 export const PlacingChord = ts('PlacingChord', {
   lineId: S.String,

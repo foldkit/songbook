@@ -5,7 +5,7 @@ import { Url } from 'foldkit/url'
 
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 
-import { SavedLibrary } from './command'
+import { SavedLibrary, SavedLibraryJsonString } from './command'
 import { STORAGE_KEY } from './constant'
 import { Song } from './domain'
 import { Message } from './message'
@@ -30,7 +30,7 @@ export const flags: Effect.Effect<Flags> = Effect.gen(function* () {
   const json = yield* Effect.fromOption(
     Option.fromNullishOr(yield* store.get(STORAGE_KEY)),
   )
-  const decoded = yield* S.decodeEffect(S.fromJsonString(SavedLibrary))(json)
+  const decoded = yield* S.decodeEffect(SavedLibraryJsonString)(json)
   return Flags.make({ maybeSavedLibrary: Option.some(decoded) })
 }).pipe(
   Effect.catch(() =>
