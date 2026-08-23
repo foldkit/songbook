@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Array, Option } from 'effect'
+import { Array, Option, pipe } from 'effect'
 import { Submodel } from 'foldkit'
 import { type Html, type HtmlBuilder, childAttributes } from 'foldkit/html'
 
@@ -195,6 +195,31 @@ const sectionActionsView = (
     ],
   )
 
+const dragHandleIcon = (h: HtmlBuilder<Message>): Html =>
+  h.svg(
+    [
+      h.AriaHidden(true),
+      h.Class('h-4 w-2.5'),
+      h.Xmlns('http://www.w3.org/2000/svg'),
+      h.Fill('currentColor'),
+      h.ViewBox('0 0 10 16'),
+    ],
+    [
+      h.circle([h.Cx('2'), h.Cy('2'), h.R('1.25')]),
+      h.circle([h.Cx('8'), h.Cy('2'), h.R('1.25')]),
+      h.circle([h.Cx('2'), h.Cy('8'), h.R('1.25')]),
+      h.circle([h.Cx('8'), h.Cy('8'), h.R('1.25')]),
+      h.circle([h.Cx('2'), h.Cy('14'), h.R('1.25')]),
+      h.circle([h.Cx('8'), h.Cy('14'), h.R('1.25')]),
+    ],
+  )
+
+const sectionDragHandleView = (h: HtmlBuilder<Message>): Html =>
+  h.div(
+    [h.Class(className.dragHandle), h.AriaHidden(true)],
+    [dragHandleIcon(h)],
+  )
+
 const sectionView = (
   model: Model,
   section: Section.Section,
@@ -212,66 +237,127 @@ const sectionView = (
   const isKeyboardDragged =
     model.sectionDragAndDrop.dragState._tag === 'KeyboardDragging' &&
     isThisSectionDragged
+  const isEditingLyrics = isEditingSection(model, section.id)
 
   return h.keyed('li')(
     section.id,
     [
       h.Class(
-        clsx('rounded-lg border bg-white p-4 shadow-sm', {
+        clsx('flex overflow-hidden rounded-lg border bg-white shadow-sm', {
           'border-dashed border-stone-300 opacity-50': isPointerDragged,
           'border-amber-700': isKeyboardDragged,
           'border-stone-200': !isPointerDragged && !isKeyboardDragged,
         }),
       ),
-      ...DragAndDrop.sortable(section.id),
+      ...(isEditingLyrics
+        ? []
+        : DragAndDrop.draggable(
+            {
+              model: model.sectionDragAndDrop,
+              toParentMessage: message =>
+                Message.GotSectionDragAndDropMessage({ message }),
+              itemId: section.id,
+              containerId: SECTIONS_CONTAINER_ID,
+              index,
+            },
+            h,
+          )),
     ],
     [
+      sectionDragHandleView(h),
       h.div(
-        [h.Class('mb-3 flex items-center justify-between gap-2')],
+        [h.Class('min-w-0 flex-1 p-4')],
         [
           h.div(
-            [h.Class('flex min-w-0 items-center gap-2')],
+            [h.Class('mb-3 flex items-center justify-between gap-2')],
             [
-              Button.view(
-                {
-                  toView: attributes =>
-                    h.button(
-                      [
-                        ...attributes.button,
-                        h.Class(className.dragHandle),
-                        h.AriaLabel(
-                          `Reorder ${Section.kindLabel(section.kind)}`,
-                        ),
-                        ...DragAndDrop.draggable(
-                          {
-                            model: model.sectionDragAndDrop,
-                            toParentMessage: message =>
-                              Message.GotSectionDragAndDropMessage({
-                                message,
-                              }),
-                            itemId: section.id,
-                            containerId: SECTIONS_CONTAINER_ID,
-                            index,
-                          },
-                          h,
-                        ),
-                      ],
-                      ['Move'],
-                    ),
-                },
-                h,
-              ),
               h.h2(
                 [h.Class('text-lg font-semibold text-stone-800')],
                 [Section.kindLabel(section.kind)],
               ),
+              sectionActionsView(section, canRemove, h),
             ],
           ),
-          sectionActionsView(section, canRemove, h),
+          sectionBodyView(section, model, h),
         ],
       ),
-      sectionBodyView(section, model, h),
     ],
+  )
+}
+
+const dropPlaceholder = (h: HtmlBuilder<Message>): Html =>
+  h.keyed('li')('drop-placeholder', [
+    h.Class(
+      'min-h-24 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50',
+    ),
+    h.AriaHidden(true),
+  ])
+
+const defaultSectionElements = (
+  model: Model,
+  canRemove: boolean,
+  h: HtmlBuilder<Message>,
+): ReadonlyArray<Html> =>
+  Array.map(model.song.sections, (section, index) =>
+    sectionView(model, section, index, canRemove, h),
+  )
+
+const previewSectionElements = (
+  model: Model,
+  canRemove: boolean,
+  h: HtmlBuilder<Message>,
+): ReadonlyArray<Html> => {
+  if (!DragAndDrop.isDragging(model.sectionDragAndDrop)) {
+    return defaultSectionElements(model, canRemove, h)
+  }
+
+  return Option.match(
+    DragAndDrop.maybeDraggedItemId(model.sectionDragAndDrop),
+    {
+      onNone: () => defaultSectionElements(model, canRemove, h),
+      onSome: draggedId => {
+        const maybeTarget = DragAndDrop.maybeDropTarget(
+          model.sectionDragAndDrop,
+        )
+        const visibleSections = Array.filter(
+          model.song.sections,
+          ({ id }) => id !== draggedId,
+        )
+        const sectionElements = Array.map(visibleSections, (section, index) =>
+          sectionView(model, section, index, canRemove, h),
+        )
+
+        const isTargetList = Option.exists(
+          maybeTarget,
+          target => target.containerId === SECTIONS_CONTAINER_ID,
+        )
+
+        if (!isTargetList) {
+          return sectionElements
+        }
+
+        const targetIndex = Option.match(maybeTarget, {
+          onNone: () => visibleSections.length,
+          onSome: target => Math.min(target.index, visibleSections.length),
+        })
+
+        const isPointerDrag =
+          model.sectionDragAndDrop.dragState._tag === 'Dragging'
+        const insertElement = isPointerDrag
+          ? dropPlaceholder(h)
+          : Option.match(Song.findSection(model.song, draggedId), {
+              onNone: () => dropPlaceholder(h),
+              onSome: section =>
+                sectionView(model, section, targetIndex, canRemove, h),
+            })
+
+        return pipe(
+          sectionElements,
+          Array.insertAt(targetIndex, insertElement),
+          Option.getOrElse(() => Array.append(sectionElements, insertElement)),
+        )
+      },
+    },
   )
 }
 
@@ -476,9 +562,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) => {
           h.Class('flex flex-col gap-4'),
           ...DragAndDrop.droppable(SECTIONS_CONTAINER_ID, 'Sections'),
         ],
-        Array.map(model.song.sections, (section, index) =>
-          sectionView(model, section, index, canRemove, h),
-        ),
+        previewSectionElements(model, canRemove, h),
       ),
       ghostSectionView(model, h),
       h.div(
