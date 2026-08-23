@@ -3,7 +3,11 @@ import { ts } from 'foldkit/schema'
 
 import { Dialog, DragAndDrop, Menu } from '@foldkit/ui'
 
-import { PLACEHOLDER_SECTION_ID, PLACEHOLDER_SONG_ID } from '../../constant'
+import {
+  CHORD_MENU_ID,
+  PLACEHOLDER_SECTION_ID,
+  PLACEHOLDER_SONG_ID,
+} from '../../constant'
 import { Line, Song } from '../../domain'
 
 export const Viewing = ts('Viewing')
@@ -15,7 +19,6 @@ export const EditingLyrics = ts('EditingLyrics', {
 export const PlacingChord = ts('PlacingChord', {
   lineId: S.String,
   at: S.Number,
-  draft: S.String,
   maybeMarkId: S.Option(S.String),
 })
 
@@ -29,7 +32,9 @@ export type EditorMode = typeof EditorMode.Type
 export const Model = S.Struct({
   song: Song.Song,
   mode: EditorMode,
+  paletteDraft: S.String,
   addSectionMenu: Menu.Model,
+  chordMenu: Menu.Model,
   sectionDragAndDrop: DragAndDrop.Model,
   deleteSectionDialog: Dialog.Model,
   maybePendingDeleteSectionId: S.Option(S.String),
@@ -44,7 +49,9 @@ export const init = (
   {
     song,
     mode: Viewing(),
+    paletteDraft: '',
     addSectionMenu: Menu.init({ id: 'add-section-menu' }),
+    chordMenu: Menu.init({ id: CHORD_MENU_ID }),
     sectionDragAndDrop: DragAndDrop.init({
       id: 'section-dnd',
       orientation: 'Vertical',

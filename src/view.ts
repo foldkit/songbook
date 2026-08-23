@@ -1,5 +1,8 @@
+import clsx from 'clsx'
 import { Match as M, Option } from 'effect'
 import type { Document, Html, HtmlBuilder } from 'foldkit/html'
+
+import { DragAndDrop } from '@foldkit/ui'
 
 import { Song } from './domain'
 import { Message } from './message'
@@ -9,6 +12,7 @@ import { Editor, Home, Play } from './page'
 import { homeRouter } from './route'
 import { Toast } from './toast'
 import * as className from './view/className'
+import { themeSelector } from './view/themeSelector'
 
 const descriptionView = (
   maybeDescription: Option.Option<string>,
@@ -17,7 +21,10 @@ const descriptionView = (
   Option.match(maybeDescription, {
     onNone: () => h.empty,
     onSome: description =>
-      h.p([h.Class('mt-1 text-sm text-stone-600')], [description]),
+      h.p(
+        [h.Class('mt-1 text-sm text-stone-600 dark:text-stone-400')],
+        [description],
+      ),
   })
 
 const toastView = (model: Model, h: HtmlBuilder<Message>): Html =>
@@ -32,7 +39,7 @@ const toastView = (model: Model, h: HtmlBuilder<Message>): Html =>
         h.div(
           [
             h.Class(
-              'pointer-events-auto max-w-sm rounded-md border border-stone-200 bg-white px-4 py-3 shadow-lg',
+              'pointer-events-auto max-w-sm rounded-md border border-stone-200 bg-white px-4 py-3 shadow-lg dark:border-stone-700 dark:bg-stone-900',
             ),
           ],
           [
@@ -43,7 +50,11 @@ const toastView = (model: Model, h: HtmlBuilder<Message>): Html =>
                   [],
                   [
                     h.p(
-                      [h.Class('font-medium text-stone-900')],
+                      [
+                        h.Class(
+                          'font-medium text-stone-900 dark:text-stone-100',
+                        ),
+                      ],
                       [entry.payload.title],
                     ),
                     descriptionView(entry.payload.maybeDescription, h),
@@ -95,7 +106,10 @@ const missingSongView = (h: HtmlBuilder<Message>): Html =>
     [h.Class('flex flex-col items-center gap-4 py-16 text-center')],
     [
       h.h1([h.Class(className.heading)], ['Song not found']),
-      h.p([h.Class('text-stone-600')], ['This chart is not in your library.']),
+      h.p(
+        [h.Class('text-stone-600 dark:text-stone-400')],
+        ['This chart is not in your library.'],
+      ),
       h.a(
         [h.Href(homeRouter()), h.Class(className.secondaryButton)],
         ['Back to library'],
@@ -145,9 +159,26 @@ const routeBodyView = (model: Model, h: HtmlBuilder<Message>): Html =>
 export const view = (model: Model, h: HtmlBuilder<Message>): Document => ({
   title: documentTitle(model),
   body: h.div(
-    [h.Class(className.pageShell)],
     [
-      h.div([h.Class(className.pageInner)], [routeBodyView(model, h)]),
+      h.Class(
+        clsx(className.pageShell, {
+          'is-dragging': DragAndDrop.isDragging(
+            model.editor.sectionDragAndDrop,
+          ),
+        }),
+      ),
+    ],
+    [
+      h.div(
+        [h.Class(className.pageInner)],
+        [
+          h.div(
+            [h.Class('mb-6 flex justify-end')],
+            [themeSelector(model.maybeThemePreference, h)],
+          ),
+          routeBodyView(model, h),
+        ],
+      ),
       toastView(model, h),
     ],
   ),

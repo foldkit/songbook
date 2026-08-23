@@ -3,12 +3,13 @@ import { Array, Option, pipe } from 'effect'
 import { Submodel } from 'foldkit'
 import { type Html, type HtmlBuilder, childAttributes } from 'foldkit/html'
 
-import { Button, Dialog, DragAndDrop, Menu } from '@foldkit/ui'
+import { Button, Dialog, DragAndDrop, Input, Menu } from '@foldkit/ui'
 
 import {
   ARTIST_INPUT_ID,
   KEY_INPUT_ID,
   LYRICS_TEXTAREA_ID,
+  PALETTE_INPUT_ID,
   SECTIONS_CONTAINER_ID,
   TITLE_INPUT_ID,
 } from '../../constant'
@@ -69,6 +70,107 @@ const metadataView = (song: Song.Song, h: HtmlBuilder<Message>): Html =>
     ],
   )
 
+const paletteChipView = (name: string, h: HtmlBuilder<Message>): Html =>
+  h.div(
+    [
+      h.Class(
+        'inline-flex overflow-hidden rounded-md border border-stone-300 dark:border-stone-600',
+      ),
+    ],
+    [
+      h.span(
+        [h.Class('px-3 py-2 font-semibold text-amber-800 dark:text-amber-300')],
+        [name],
+      ),
+      Button.view(
+        {
+          onClick: Message.ClickedRemovePaletteChord({ name }),
+          toView: attributes =>
+            h.button(
+              [
+                ...attributes.button,
+                h.Class(className.quietButton),
+                h.AriaLabel(`Remove ${name} from this song`),
+              ],
+              ['×'],
+            ),
+        },
+        h,
+      ),
+    ],
+  )
+
+const paletteView = (model: Model, h: HtmlBuilder<Message>): Html =>
+  h.div(
+    [
+      h.Class(
+        'flex flex-col gap-3 rounded-lg border border-stone-200 bg-white p-4 dark:border-stone-700 dark:bg-stone-900',
+      ),
+    ],
+    [
+      h.div(
+        [h.Class('flex min-w-0 flex-col gap-2')],
+        [
+          h.h2(
+            [h.Class('text-sm font-medium text-stone-600 dark:text-stone-400')],
+            ['Chords in this song'],
+          ),
+          Array.match(model.song.chords, {
+            onEmpty: () =>
+              h.p(
+                [h.Class('text-sm text-stone-500 dark:text-stone-400')],
+                ['Add the chords you need, then tap a word to place one.'],
+              ),
+            onNonEmpty: chords =>
+              h.div(
+                [h.Class('flex flex-wrap gap-2')],
+                Array.map(chords, name => paletteChipView(name, h)),
+              ),
+          }),
+        ],
+      ),
+      h.form(
+        [
+          h.Class('flex flex-wrap items-end gap-2'),
+          h.OnSubmit(Message.SubmittedPaletteChord()),
+        ],
+        [
+          Input.view(
+            {
+              id: PALETTE_INPUT_ID,
+              value: model.paletteDraft,
+              onInput: value => Message.UpdatedPaletteDraft({ value }),
+              placeholder: 'G',
+              toView: attributes =>
+                h.div(
+                  [h.Class('flex min-w-40 flex-1 flex-col gap-1')],
+                  [
+                    h.label(
+                      [...attributes.label, h.Class(className.label)],
+                      ['Add a chord'],
+                    ),
+                    h.input([...attributes.input, h.Class(className.input)]),
+                  ],
+                ),
+            },
+            h,
+          ),
+          Button.view(
+            {
+              type: 'submit',
+              toView: attributes =>
+                h.button(
+                  [...attributes.button, h.Class(className.secondaryButton)],
+                  ['Add'],
+                ),
+            },
+            h,
+          ),
+        ],
+      ),
+    ],
+  )
+
 const lyricsEditorView = (draft: string, h: HtmlBuilder<Message>): Html =>
   h.div(
     [h.Class('flex flex-col gap-3')],
@@ -116,7 +218,7 @@ const lyricsEditorView = (draft: string, h: HtmlBuilder<Message>): Html =>
 
 const emptySectionBodyView = (h: HtmlBuilder<Message>): Html =>
   h.p(
-    [h.Class('text-sm text-stone-500')],
+    [h.Class('text-sm text-stone-500 dark:text-stone-400')],
     ['No lyrics yet. Edit lyrics and paste while you listen.'],
   )
 
@@ -134,7 +236,15 @@ const chordLinesView = (
           h.keyed('div')(
             line.id,
             [],
-            [lineView(line, maybePlacingChord(model), h)],
+            [
+              lineView(
+                line,
+                maybePlacingChord(model),
+                model.song.chords,
+                model.chordMenu,
+                h,
+              ),
+            ],
           ),
         ),
       ),
@@ -214,9 +324,28 @@ const dragHandleIcon = (h: HtmlBuilder<Message>): Html =>
     ],
   )
 
-const sectionDragHandleView = (h: HtmlBuilder<Message>): Html =>
+const sectionDragHandleView = (
+  model: Model,
+  section: Section.Section,
+  index: number,
+  h: HtmlBuilder<Message>,
+): Html =>
   h.div(
-    [h.Class(className.dragHandle), h.AriaHidden(true)],
+    [
+      h.Class(className.dragHandle),
+      h.AriaLabel(`Reorder ${Section.kindLabel(section.kind)}`),
+      ...DragAndDrop.draggable(
+        {
+          model: model.sectionDragAndDrop,
+          toParentMessage: message =>
+            Message.GotSectionDragAndDropMessage({ message }),
+          itemId: section.id,
+          containerId: SECTIONS_CONTAINER_ID,
+          index,
+        },
+        h,
+      ),
+    ],
     [dragHandleIcon(h)],
   )
 
@@ -237,34 +366,22 @@ const sectionView = (
   const isKeyboardDragged =
     model.sectionDragAndDrop.dragState._tag === 'KeyboardDragging' &&
     isThisSectionDragged
-  const isEditingLyrics = isEditingSection(model, section.id)
 
   return h.keyed('li')(
     section.id,
     [
       h.Class(
-        clsx('flex overflow-hidden rounded-lg border bg-white shadow-sm', {
-          'border-dashed border-stone-300 opacity-50': isPointerDragged,
-          'border-amber-700': isKeyboardDragged,
-          'border-stone-200': !isPointerDragged && !isKeyboardDragged,
+        clsx('flex rounded-lg border bg-white shadow-sm dark:bg-stone-900', {
+          'border-dashed border-stone-300 opacity-50 dark:border-stone-600':
+            isPointerDragged,
+          'border-amber-700 dark:border-amber-400': isKeyboardDragged,
+          'border-stone-200 dark:border-stone-700':
+            !isPointerDragged && !isKeyboardDragged,
         }),
       ),
-      ...(isEditingLyrics
-        ? []
-        : DragAndDrop.draggable(
-            {
-              model: model.sectionDragAndDrop,
-              toParentMessage: message =>
-                Message.GotSectionDragAndDropMessage({ message }),
-              itemId: section.id,
-              containerId: SECTIONS_CONTAINER_ID,
-              index,
-            },
-            h,
-          )),
     ],
     [
-      sectionDragHandleView(h),
+      sectionDragHandleView(model, section, index, h),
       h.div(
         [h.Class('min-w-0 flex-1 p-4')],
         [
@@ -272,7 +389,11 @@ const sectionView = (
             [h.Class('mb-3 flex items-center justify-between gap-2')],
             [
               h.h2(
-                [h.Class('text-lg font-semibold text-stone-800')],
+                [
+                  h.Class(
+                    'text-lg font-semibold text-stone-800 dark:text-stone-100',
+                  ),
+                ],
                 [Section.kindLabel(section.kind)],
               ),
               sectionActionsView(section, canRemove, h),
@@ -288,7 +409,7 @@ const sectionView = (
 const dropPlaceholder = (h: HtmlBuilder<Message>): Html =>
   h.keyed('li')('drop-placeholder', [
     h.Class(
-      'min-h-24 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50',
+      'min-h-24 rounded-lg border-2 border-dashed border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950',
     ),
     h.AriaHidden(true),
   ])
@@ -374,7 +495,7 @@ const addSectionMenuView = (model: Model, h: HtmlBuilder<Message>): Html =>
           items: Section.SECTION_KINDS,
           itemToConfig: (kind: Section.SectionKind) => ({
             className:
-              'px-3 py-2 text-sm text-stone-800 cursor-pointer data-[active]:bg-stone-100',
+              'cursor-pointer px-3 py-2 text-sm text-stone-800 data-[active]:bg-stone-100 dark:text-stone-200 dark:data-[active]:bg-stone-800',
             content: h.span([], [Section.kindLabel(kind)]),
           }),
           buttonContent: h.span([], ['Add section']),
@@ -383,7 +504,7 @@ const addSectionMenuView = (model: Model, h: HtmlBuilder<Message>): Html =>
           ]),
           itemsAttributes: childAttributes([
             h.Class(
-              'w-44 rounded-md border border-stone-200 bg-white shadow-lg overflow-hidden z-10 outline-none',
+              'z-10 w-44 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg outline-none dark:border-stone-700 dark:bg-stone-900',
             ),
           ]),
           attributes: childAttributes([h.Class('relative inline-block')]),
@@ -410,27 +531,31 @@ const deleteSectionDialogView = (model: Model, h: HtmlBuilder<Message>): Html =>
             ? [
                 h.div([
                   ...render.backdrop,
-                  h.Class('fixed inset-0 bg-stone-900/40'),
+                  h.Class('fixed inset-0 bg-stone-900/40 dark:bg-black/60'),
                 ]),
                 h.div(
                   [
                     ...render.panel,
                     h.Class(
-                      'relative z-10 mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl',
+                      'relative z-10 mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-stone-900',
                     ),
                   ],
                   [
                     h.h2(
                       [
                         ...render.title,
-                        h.Class('text-lg font-semibold text-stone-900'),
+                        h.Class(
+                          'text-lg font-semibold text-stone-900 dark:text-stone-100',
+                        ),
                       ],
                       ['Remove this section?'],
                     ),
                     h.p(
                       [
                         ...render.description,
-                        h.Class('mt-2 text-sm text-stone-600'),
+                        h.Class(
+                          'mt-2 text-sm text-stone-600 dark:text-stone-400',
+                        ),
                       ],
                       ['Lyrics and chords in the section will be deleted.'],
                     ),
@@ -500,7 +625,7 @@ const ghostSectionView = (model: Model, h: HtmlBuilder<Message>): Html =>
             h.div(
               [
                 h.Class(
-                  'rounded-lg border border-stone-200 bg-white p-4 shadow-lg',
+                  'rounded-lg border border-stone-200 bg-white p-4 shadow-lg dark:border-stone-700 dark:bg-stone-900',
                 ),
               ],
               [Section.kindLabel(section.kind)],
@@ -548,12 +673,16 @@ export const view = Submodel.defineView<Model, Message>((model, h) => {
             ],
           ),
           metadataView(model.song, h),
+          paletteView(model, h),
         ],
       ),
       h.div(
         [h.Class('flex items-center justify-between')],
         [
-          h.h2([h.Class('text-sm font-medium text-stone-600')], ['Sections']),
+          h.h2(
+            [h.Class('text-sm font-medium text-stone-600 dark:text-stone-400')],
+            ['Sections'],
+          ),
           addSectionMenuView(model, h),
         ],
       ),

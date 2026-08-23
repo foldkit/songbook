@@ -20,19 +20,22 @@ const emptyLibraryView = (h: HtmlBuilder<Message>): Html =>
   h.div(
     [
       h.Class(
-        'rounded-lg border border-dashed border-stone-300 bg-white px-6 py-12 text-center',
+        'rounded-lg border border-dashed border-stone-300 bg-white px-6 py-12 text-center dark:border-stone-600 dark:bg-stone-900',
       ),
     ],
     [
       h.p(
-        [h.Class('text-stone-600')],
+        [h.Class('text-stone-600 dark:text-stone-400')],
         ['No songs yet. Start a chart and paste lyrics while you listen.'],
       ),
     ],
   )
 
 const noMatchesView = (h: HtmlBuilder<Message>): Html =>
-  h.p([h.Class('text-stone-600')], ['No songs match that search.'])
+  h.p(
+    [h.Class('text-stone-600 dark:text-stone-400')],
+    ['No songs match that search.'],
+  )
 
 const songRowView = (song: Song.Song, h: HtmlBuilder<Message>): Html =>
   h.keyed('li')(
@@ -42,12 +45,17 @@ const songRowView = (song: Song.Song, h: HtmlBuilder<Message>): Html =>
       h.a(
         [
           h.Href(songEditRouter({ songId: song.id })),
-          h.Class('text-lg font-semibold text-stone-900 hover:underline'),
+          h.Class(
+            'text-lg font-semibold text-stone-900 hover:underline dark:text-stone-100',
+          ),
         ],
         [Song.displayTitle(song)],
       ),
       Str.isNonEmpty(song.artist)
-        ? h.p([h.Class('text-sm text-stone-500')], [song.artist])
+        ? h.p(
+            [h.Class('text-sm text-stone-500 dark:text-stone-400')],
+            [song.artist],
+          )
         : h.empty,
       h.div(
         [h.Class('mt-3 flex flex-wrap gap-2')],
@@ -121,27 +129,31 @@ const deleteDialogView = (model: Model, h: HtmlBuilder<Message>): Html =>
             ? [
                 h.div([
                   ...render.backdrop,
-                  h.Class('fixed inset-0 bg-stone-900/40'),
+                  h.Class('fixed inset-0 bg-stone-900/40 dark:bg-black/60'),
                 ]),
                 h.div(
                   [
                     ...render.panel,
                     h.Class(
-                      'relative z-10 mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl',
+                      'relative z-10 mx-auto max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-stone-900',
                     ),
                   ],
                   [
                     h.h2(
                       [
                         ...render.title,
-                        h.Class('text-lg font-semibold text-stone-900'),
+                        h.Class(
+                          'text-lg font-semibold text-stone-900 dark:text-stone-100',
+                        ),
                       ],
                       ['Delete this song?'],
                     ),
                     h.p(
                       [
                         ...render.description,
-                        h.Class('mt-2 text-sm text-stone-600'),
+                        h.Class(
+                          'mt-2 text-sm text-stone-600 dark:text-stone-400',
+                        ),
                       ],
                       ['This cannot be undone.'],
                     ),

@@ -2,7 +2,13 @@ import { Option } from 'effect'
 import { Command, given, message, model, story } from 'foldkit/story'
 import { describe, expect, test } from 'vitest'
 
-import { GenerateSongIds, NavigateInternal, SaveLibrary } from './command'
+import {
+  ApplyTheme,
+  GenerateSongIds,
+  NavigateInternal,
+  SaveLibrary,
+  SaveThemePreference,
+} from './command'
 import { Song } from './domain'
 import { Message } from './message'
 import type { Model } from './model'
@@ -19,6 +25,9 @@ const emptyModel: Model = {
   play: Play.init(Play.placeholderSong)[0],
   toast: Toast.init({ id: 'app-toast' }),
   maybePendingEditSongId: Option.none(),
+  maybeThemePreference: Option.some('System'),
+  systemTheme: 'Light',
+  resolvedTheme: 'Light',
 }
 
 describe('library', () => {
@@ -49,6 +58,56 @@ describe('library', () => {
         NavigateInternal({ url: songEditRouter({ songId }) }),
       ),
       Command.resolve(NavigateInternal, Message.CompletedNavigateInternal()),
+    )
+  })
+})
+
+describe('theme', () => {
+  test('selecting dark mode applies and persists it', () => {
+    story(
+      update,
+      given(emptyModel),
+      message(Message.SelectedThemePreference({ preference: 'Dark' })),
+      model(current => {
+        expect(current.maybeThemePreference).toEqual(Option.some('Dark'))
+        expect(current.resolvedTheme).toBe('Dark')
+      }),
+      Command.expectExact(
+        ApplyTheme({ theme: 'Dark' }),
+        SaveThemePreference({ preference: 'Dark' }),
+      ),
+      Command.resolve(ApplyTheme, Message.CompletedApplyTheme()),
+      Command.resolve(
+        SaveThemePreference,
+        Message.CompletedSaveThemePreference(),
+      ),
+    )
+  })
+
+  test('system theme changes apply only while preference is System', () => {
+    story(
+      update,
+      given(emptyModel),
+      message(Message.ChangedSystemTheme({ theme: 'Dark' })),
+      model(current => {
+        expect(current.systemTheme).toBe('Dark')
+        expect(current.resolvedTheme).toBe('Dark')
+      }),
+      Command.expectExact(ApplyTheme({ theme: 'Dark' })),
+      Command.resolve(ApplyTheme, Message.CompletedApplyTheme()),
+      message(Message.SelectedThemePreference({ preference: 'Light' })),
+      Command.resolve(ApplyTheme, Message.CompletedApplyTheme()),
+      Command.resolve(
+        SaveThemePreference,
+        Message.CompletedSaveThemePreference(),
+      ),
+      message(Message.ChangedSystemTheme({ theme: 'Dark' })),
+      model(current => {
+        expect(current.systemTheme).toBe('Dark')
+        expect(current.resolvedTheme).toBe('Light')
+      }),
+      Command.expectExact(ApplyTheme({ theme: 'Light' })),
+      Command.resolve(ApplyTheme, Message.CompletedApplyTheme()),
     )
   })
 })

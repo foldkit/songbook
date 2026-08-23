@@ -1,4 +1,4 @@
-import { Array, Option, Schema as S, String as Str, pipe } from 'effect'
+import { Array, Effect, Option, Schema as S, String as Str, pipe } from 'effect'
 import { evo } from 'foldkit/struct'
 
 import * as Chord from './chord'
@@ -13,6 +13,9 @@ export const Song = S.Struct({
   maybeOriginalKey: S.Option(S.String),
   transpose: S.Number,
   capo: S.Number,
+  chords: S.Array(S.String).pipe(
+    S.withDecodingDefaultTypeKey(Effect.succeed<ReadonlyArray<string>>([])),
+  ),
   sections: S.Array(Section),
 })
 
@@ -25,6 +28,7 @@ export const create = (id: string, sectionId: string): Song => ({
   maybeOriginalKey: Option.none(),
   transpose: 0,
   capo: 0,
+  chords: [],
   sections: [SectionModule.empty(sectionId, 'Verse')],
 })
 
@@ -57,6 +61,18 @@ export const remove = (
   songs: ReadonlyArray<Song>,
   songId: string,
 ): ReadonlyArray<Song> => Array.filter(songs, ({ id }) => id !== songId)
+
+export const addChord = (song: Song, name: string): Song => {
+  const chord = pipe(name, Str.trim)
+  if (pipe(chord, Str.isEmpty) || Array.contains(song.chords, chord)) {
+    return song
+  }
+
+  return evo(song, { chords: Array.append(chord) })
+}
+
+export const removeChord = (song: Song, name: string): Song =>
+  evo(song, { chords: Array.filter(chord => chord !== name) })
 
 export const matchesQuery = (song: Song, query: string): boolean => {
   const normalized = pipe(query, Str.trim, Str.toLowerCase)

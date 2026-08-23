@@ -31,6 +31,7 @@ describe('library persistence', () => {
       'Blackbird singing',
     )
     expect(decoded.songs[0]?.maybeOriginalKey).toEqual(Option.some('G'))
+    expect(decoded.songs[0]?.chords).toEqual([])
     expect(Option.isSome(Song.findById(decoded.songs, 'song-1'))).toBe(true)
   })
 
@@ -58,6 +59,7 @@ describe('library persistence', () => {
     const decoded = S.decodeSync(SavedLibraryJsonString)(encoded)
 
     expect(Option.isSome(Song.findById(decoded.songs, 'song-1'))).toBe(true)
+    expect(decoded.songs[0]?.chords).toEqual([])
   })
 
   test('booting on a song URL finds the saved chart', () => {
@@ -67,13 +69,38 @@ describe('library persistence', () => {
     const url = Option.getOrThrow(
       urlFromString('http://localhost/songs/song-1'),
     )
-    const [model] = init(
-      Flags.make({ maybeSavedLibrary: Option.some(decoded) }),
+    const [model, commands] = init(
+      Flags.make({
+        maybeSavedLibrary: Option.some(decoded),
+        maybeThemePreference: Option.none(),
+        systemTheme: 'Light',
+      }),
       url,
     )
 
     expect(model.route._tag).toBe('SongEdit')
     expect(Option.isSome(Song.findById(model.songs, 'song-1'))).toBe(true)
     expect(model.editor.song.id).toBe('song-1')
+    expect(model.maybeThemePreference).toEqual(Option.some('System'))
+    expect(model.resolvedTheme).toBe('Light')
+    expect(commands).toHaveLength(1)
+    expect(commands[0]?.name).toBe('ApplyTheme')
+  })
+
+  test('booting with a saved dark preference resolves dark', () => {
+    const url = Option.getOrThrow(urlFromString('http://localhost/'))
+    const [model, commands] = init(
+      Flags.make({
+        maybeSavedLibrary: Option.none(),
+        maybeThemePreference: Option.some('Dark'),
+        systemTheme: 'Light',
+      }),
+      url,
+    )
+
+    expect(model.maybeThemePreference).toEqual(Option.some('Dark'))
+    expect(model.resolvedTheme).toBe('Dark')
+    expect(commands).toHaveLength(1)
+    expect(commands[0]?.name).toBe('ApplyTheme')
   })
 })

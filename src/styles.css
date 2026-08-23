@@ -1,1 +1,27 @@
 @import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@custom-variant hover {
+  @media (hover: hover) {
+    &:hover:not(:where(.is-dragging *, .is-dragging)) {
+      @slot;
+    }
+  }
+}
+
+@layer base {
+  html {
+    @apply bg-stone-50 dark:bg-stone-950;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  .is-dragging,
+  .is-dragging * {
+    cursor: grabbing !important;
+  }
+}

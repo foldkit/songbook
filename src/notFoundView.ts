@@ -11,7 +11,10 @@ export const notFoundView = <Message>(
     [h.Class('flex flex-col items-center gap-4 py-16 text-center')],
     [
       h.h1([h.Class(className.heading)], ['Page not found']),
-      h.p([h.Class('text-stone-600')], [`Nothing is saved at “${path}”.`]),
+      h.p(
+        [h.Class('text-stone-600 dark:text-stone-400')],
+        [`Nothing is saved at “${path}”.`],
+      ),
       h.a(
         [h.Href(homeRouter()), h.Class(className.secondaryButton)],
         ['Back to library'],

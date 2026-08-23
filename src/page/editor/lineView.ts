@@ -1,20 +1,22 @@
 import { Array, Match as M, Option, String as Str } from 'effect'
 import type { Html, HtmlBuilder } from 'foldkit/html'
+import { childAttributes } from 'foldkit/html'
 
-import { Button, Input } from '@foldkit/ui'
+import { Button, Menu } from '@foldkit/ui'
 
-import { CHORD_DRAFT_INPUT_ID } from '../../constant'
+import { CHORD_MENU_CLEAR, CHORD_MENU_EMPTY } from '../../constant'
 import { Line } from '../../domain'
 import * as className from '../../view/className'
 import { Message } from './message'
 import type { Model, PlacingChord } from './model'
 
-const chordDraftKeyMessage = (key: string): Option.Option<Message> =>
-  M.value(key).pipe(
-    M.when('Escape', () => Message.PressedCancelChord()),
-    M.when('Enter', () => Message.PressedCommitChord()),
-    M.option,
-  )
+const ChordMenu = Menu.create<string>()
+
+const MENU_ANCHOR = {
+  placement: 'bottom-start' as const,
+  gap: 4,
+  padding: 8,
+}
 
 const isPlacingOnWord = (
   maybePlacing: Option.Option<PlacingChord>,
@@ -26,6 +28,16 @@ const isPlacingOnWord = (
     placing => placing.lineId === lineId && placing.at === at,
   )
 
+const chordMenuItems = (
+  chords: ReadonlyArray<string>,
+  hasMark: boolean,
+): ReadonlyArray<string> =>
+  Array.match(chords, {
+    onEmpty: () => [CHORD_MENU_EMPTY],
+    onNonEmpty: names =>
+      hasMark ? Array.append(names, CHORD_MENU_CLEAR) : names,
+  })
+
 const chordSlotView = (
   line: Line.LyricLine,
   word: Line.Word,
@@ -33,39 +45,14 @@ const chordSlotView = (
   h: HtmlBuilder<Message>,
 ): Html => {
   if (isPlacingOnWord(maybePlacing, line.id, word.start)) {
-    const draft = Option.match(maybePlacing, {
-      onNone: () => '',
-      onSome: ({ draft }) => draft,
+    return Option.match(Line.markAt(line, word.start), {
+      onNone: () => h.div([h.Class('min-h-7')]),
+      onSome: ({ name }) =>
+        h.div(
+          [h.Class('min-h-7 font-semibold text-amber-800 dark:text-amber-300')],
+          [name],
+        ),
     })
-
-    return Input.view(
-      {
-        id: CHORD_DRAFT_INPUT_ID,
-        value: draft,
-        onInput: value => Message.UpdatedChordDraft({ value }),
-        placeholder: 'Am',
-        isAutofocus: true,
-        toView: attributes =>
-          h.div(
-            [h.Class('min-h-7')],
-            [
-              h.label(
-                [...attributes.label, h.Class('sr-only')],
-                [`Chord on ${word.text}`],
-              ),
-              h.input([
-                ...attributes.input,
-                h.Class(
-                  'w-16 rounded-sm border border-amber-700 bg-white px-1 py-0.5 font-semibold text-amber-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400',
-                ),
-                h.OnBlur(Message.BlurredChordDraft()),
-                h.OnKeyDownPreventDefault(chordDraftKeyMessage),
-              ]),
-            ],
-          ),
-      },
-      h,
-    )
   }
 
   const maybeMark = Line.markAt(line, word.start)
@@ -81,7 +68,7 @@ const chordSlotView = (
               [
                 ...attributes.button,
                 h.Class(
-                  'min-h-7 cursor-pointer rounded-sm px-0.5 text-left font-semibold text-amber-800 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400',
+                  'min-h-7 cursor-pointer rounded-sm px-0.5 text-left font-semibold text-amber-800 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 dark:text-amber-300 dark:hover:bg-amber-950',
                 ),
                 h.AriaLabel(`Edit chord ${mark.name} on ${word.text}`),
               ],
@@ -114,30 +101,90 @@ const wordButtonView = (
     h,
   )
 
+const chordMenuView = (
+  word: Line.Word,
+  chords: ReadonlyArray<string>,
+  hasMark: boolean,
+  chordMenu: Menu.Model,
+  h: HtmlBuilder<Message>,
+): Html =>
+  h.submodel({
+    slotId: chordMenu.id,
+    model: chordMenu,
+    view: ChordMenu.view,
+    viewInputs: {
+      anchor: MENU_ANCHOR,
+      ariaLabel: `Choose a chord for ${word.text}`,
+      items: chordMenuItems(chords, hasMark),
+      isItemDisabled: item => item === CHORD_MENU_EMPTY,
+      itemToConfig: item => ({
+        className:
+          'min-h-11 cursor-pointer px-3 py-2 text-sm font-semibold text-amber-800 data-[active]:bg-amber-50 data-[disabled]:cursor-not-allowed data-[disabled]:font-normal data-[disabled]:text-stone-500 dark:text-amber-300 dark:data-[active]:bg-amber-950 dark:data-[disabled]:text-stone-400',
+        content: h.span(
+          [],
+          [
+            item === CHORD_MENU_EMPTY
+              ? 'Add chords to this song first'
+              : item === CHORD_MENU_CLEAR
+                ? 'Clear'
+                : item,
+          ],
+        ),
+      }),
+      buttonContent: h.span([], [word.text]),
+      buttonAttributes: childAttributes([
+        h.Class(`${className.wordButton} bg-amber-100 dark:bg-amber-950`),
+      ]),
+      itemsAttributes: childAttributes([
+        h.Class(
+          'z-20 min-w-36 overflow-hidden rounded-md border border-stone-200 bg-white shadow-lg outline-none dark:border-stone-700 dark:bg-stone-900',
+        ),
+      ]),
+      attributes: childAttributes([h.Class('relative inline-block')]),
+    },
+    toParentMessage: message => Message.GotChordMenuMessage({ message }),
+  })
+
 export const lineView = (
   line: Line.LyricLine,
   maybePlacing: Option.Option<PlacingChord>,
+  chords: ReadonlyArray<string>,
+  chordMenu: Menu.Model,
   h: HtmlBuilder<Message>,
 ): Html =>
   Array.match(Line.words(line.lyric), {
     onEmpty: () =>
       h.p(
-        [h.Class('min-h-7 text-sm text-stone-400')],
+        [h.Class('min-h-7 text-sm text-stone-400 dark:text-stone-500')],
         [Str.isNonEmpty(line.lyric) ? line.lyric : 'Empty line'],
       ),
     onNonEmpty: words =>
       h.div(
         [h.Class('flex flex-wrap items-end gap-x-2 gap-y-1')],
-        Array.map(words, word =>
-          h.keyed('div')(
+        Array.map(words, word => {
+          const isPlacingHere = isPlacingOnWord(
+            maybePlacing,
+            line.id,
+            word.start,
+          )
+
+          return h.keyed('div')(
             `${line.id}-${String(word.start)}`,
             [h.Class('flex flex-col items-start')],
             [
               chordSlotView(line, word, maybePlacing, h),
-              wordButtonView(line, word, h),
+              isPlacingHere
+                ? chordMenuView(
+                    word,
+                    chords,
+                    Option.isSome(Line.markAt(line, word.start)),
+                    chordMenu,
+                    h,
+                  )
+                : wordButtonView(line, word, h),
             ],
-          ),
-        ),
+          )
+        }),
       ),
   })
 

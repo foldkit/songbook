@@ -1,5 +1,5 @@
-import { Option } from 'effect'
-import { Command, Update } from 'foldkit'
+import { Match as M, Option } from 'effect'
+import { Update } from 'foldkit'
 import { evo } from 'foldkit/struct'
 
 import { Dialog } from '@foldkit/ui'
@@ -9,24 +9,50 @@ import { Model } from './model'
 
 type UpdateReturn = Update.ReturnWithOutMessage<Model, Message, OutMessage>
 
-const foldDeleteDialogOutMessage = (
-  outMessage: Dialog.OutMessage,
-): Update.Step<Model, Message> =>
-  Dialog.OutMessage.match<Update.Step<Model, Message>>(outMessage, {
+const readDeleteDialog = (model: Model): Option.Option<Dialog.Model> =>
+  Option.some(model.deleteDialog)
+
+const writeDeleteDialog = (
+  model: Model,
+  nextDeleteDialog: Dialog.Model,
+): Model => evo(model, { deleteDialog: () => nextDeleteDialog })
+
+const toGotDeleteDialogMessage = (message: Dialog.Message): Message =>
+  Message.GotDeleteDialogMessage({ message })
+
+const foldDeleteDialogOutMessage = M.type<Dialog.OutMessage>().pipe(
+  M.withReturnType<Update.Step<Model, Message>>(),
+  M.tagsExhaustive({
     Opened: () => model => [model, []],
     Closed: () => model => [
       evo(model, { maybePendingDeleteSongId: () => Option.none() }),
       [],
     ],
-  })
+  }),
+)
 
 const foldDeleteDialog = Update.foldChild({
   update: Dialog.update,
-  read: (model: Model) => Option.some(model.deleteDialog),
-  write: (model, nextDeleteDialog) =>
-    evo(model, { deleteDialog: () => nextDeleteDialog }),
-  toParentMessage: message => Message.GotDeleteDialogMessage({ message }),
+  read: readDeleteDialog,
+  write: writeDeleteDialog,
+  toParentMessage: toGotDeleteDialogMessage,
   toParentOutMessage: () => Option.none(),
+  foldOutMessage: foldDeleteDialogOutMessage,
+})
+
+const foldDeleteDialogOpen = Update.foldChildStep({
+  update: Dialog.open,
+  read: readDeleteDialog,
+  write: writeDeleteDialog,
+  toParentMessage: toGotDeleteDialogMessage,
+  foldOutMessage: foldDeleteDialogOutMessage,
+})
+
+const foldDeleteDialogClose = Update.foldChildStep({
+  update: Dialog.close,
+  read: readDeleteDialog,
+  write: writeDeleteDialog,
+  toParentMessage: toGotDeleteDialogMessage,
   foldOutMessage: foldDeleteDialogOutMessage,
 })
 
@@ -45,38 +71,21 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     ],
 
     ClickedDeleteSong: ({ songId }) => {
-      const [nextDialog, dialogCommands] = Dialog.open(model.deleteDialog)
-      return [
-        evo(model, {
-          deleteDialog: () => nextDialog,
-          maybePendingDeleteSongId: () => Option.some(songId),
-        }),
-        Command.mapMessages(dialogCommands, dialogMessage =>
-          Message.GotDeleteDialogMessage({ message: dialogMessage }),
-        ),
-        Option.none(),
-      ]
+      const [nextModel, commands] = foldDeleteDialogOpen(
+        evo(model, { maybePendingDeleteSongId: () => Option.some(songId) }),
+      )
+      return [nextModel, commands, Option.none()]
     },
 
     ClickedConfirmDelete: () => {
-      const [nextDialog, dialogCommands] = Dialog.close(model.deleteDialog)
       const maybeOut = Option.map(model.maybePendingDeleteSongId, songId =>
         OutMessage.ConfirmedDeleteSong({ songId }),
       )
-      return [
-        evo(model, {
-          deleteDialog: () => nextDialog,
-          maybePendingDeleteSongId: () => Option.none(),
-        }),
-        Command.mapMessages(dialogCommands, dialogMessage =>
-          Message.GotDeleteDialogMessage({ message: dialogMessage }),
-        ),
-        maybeOut,
-      ]
+      const [nextModel, commands] = foldDeleteDialogClose(
+        evo(model, { maybePendingDeleteSongId: () => Option.none() }),
+      )
+      return [nextModel, commands, maybeOut]
     },
 
-    GotDeleteDialogMessage: ({ message }) => {
-      const [nextModel, commands] = foldDeleteDialog(model, message)
-      return [nextModel, commands, Option.none()]
-    },
+    GotDeleteDialogMessage: ({ message }) => foldDeleteDialog(model, message),
   })

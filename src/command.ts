@@ -1,13 +1,18 @@
-import { Crypto, Effect, Schema as S } from 'effect'
+import { Crypto, Effect, Match as M, Schema as S } from 'effect'
 import { KeyValueStore } from 'effect/unstable/persistence'
 import { Command } from 'foldkit'
 import { load, pushUrl } from 'foldkit/navigation'
 
 import { BrowserCrypto, BrowserKeyValueStore } from '@effect/platform-browser'
 
-import { STORAGE_KEY } from './constant'
+import {
+  DARK_THEME_COLOR,
+  LIGHT_THEME_COLOR,
+  STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from './constant'
 import { Song } from './domain'
-import { Message } from './message'
+import { Message, ResolvedTheme, ThemePreference } from './message'
 
 export const SavedLibrary = S.Struct({
   songs: S.Array(Song.Song),
@@ -62,4 +67,47 @@ export const LoadExternal = Command.define('LoadExternal', {
   messages: [Message.CompletedLoadExternal],
   execute: ({ href }) =>
     load(href).pipe(Effect.as(Message.CompletedLoadExternal())),
+})
+
+const setThemeColorMeta = (color: string): void => {
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]')
+  if (themeColorMeta !== null) {
+    themeColorMeta.setAttribute('content', color)
+  }
+}
+
+export const ApplyTheme = Command.define('ApplyTheme', {
+  args: { theme: ResolvedTheme },
+  messages: [Message.CompletedApplyTheme],
+  execute: ({ theme }) =>
+    Effect.sync(() => {
+      M.value(theme).pipe(
+        M.when('Dark', () => {
+          document.documentElement.classList.add('dark')
+          setThemeColorMeta(DARK_THEME_COLOR)
+        }),
+        M.when('Light', () => {
+          document.documentElement.classList.remove('dark')
+          setThemeColorMeta(LIGHT_THEME_COLOR)
+        }),
+        M.exhaustive,
+      )
+      return Message.CompletedApplyTheme()
+    }),
+})
+
+export const SaveThemePreference = Command.define('SaveThemePreference', {
+  args: { preference: ThemePreference },
+  messages: [Message.CompletedSaveThemePreference],
+  execute: ({ preference }) =>
+    Effect.gen(function* () {
+      const store = yield* KeyValueStore.KeyValueStore
+      yield* store.set(THEME_STORAGE_KEY, JSON.stringify(preference))
+      return Message.CompletedSaveThemePreference()
+    }).pipe(
+      Effect.catch(() =>
+        Effect.succeed(Message.CompletedSaveThemePreference()),
+      ),
+      Effect.provide(BrowserKeyValueStore.layerLocalStorage),
+    ),
 })

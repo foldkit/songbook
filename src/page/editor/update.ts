@@ -1,11 +1,12 @@
 import { Array, Match as M, Option, String as Str, pipe } from 'effect'
-import { Command, Update } from 'foldkit'
+import { Update } from 'foldkit'
 import { evo } from 'foldkit/struct'
 
 import { Dialog, DragAndDrop, Menu } from '@foldkit/ui'
 
+import { CHORD_MENU_CLEAR, CHORD_MENU_EMPTY } from '../../constant'
 import { Line, Section, Song } from '../../domain'
-import { FocusChordDraft, GenerateEditorIds } from './command'
+import { GenerateEditorIds } from './command'
 import {
   DuplicateSectionRequest,
   type IdRequest,
@@ -20,6 +21,7 @@ type UpdateReturn = Update.ReturnWithOutMessage<Model, Message, OutMessage>
 const withUpdateReturn = M.withReturnType<UpdateReturn>()
 
 const AddSectionMenu = Menu.create<Section.SectionKind>()
+const ChordMenu = Menu.create<string>()
 
 const emitSong = (model: Model, song: Song.Song): UpdateReturn => [
   evo(model, { song: () => song, mode: () => Viewing() }),
@@ -33,34 +35,75 @@ const emitSongKeepMode = (model: Model, song: Song.Song): UpdateReturn => [
   Option.some(OutMessage.UpdatedSong({ song })),
 ]
 
-const foldAddSectionMenuOutMessage = (
-  outMessage: Menu.OutMessage<Section.SectionKind>,
-): Update.Step<Model, Message> =>
-  M.value(outMessage).pipe(
-    M.withReturnType<Update.Step<Model, Message>>(),
-    M.tagsExhaustive({
-      Selected:
-        ({ value }) =>
-        model => [
-          model,
-          [
-            GenerateEditorIds({
-              count: 1,
-              request: NewSectionRequest({ kind: value }),
-            }),
-          ],
+const foldAddSectionMenuOutMessage = M.type<
+  Menu.OutMessage<Section.SectionKind>
+>().pipe(
+  M.withReturnType<Update.Step<Model, Message>>(),
+  M.tagsExhaustive({
+    Selected:
+      ({ value }) =>
+      model => [
+        model,
+        [
+          GenerateEditorIds({
+            count: 1,
+            request: NewSectionRequest({ kind: value }),
+          }),
         ],
-    }),
-  )
+      ],
+  }),
+)
 
 const foldAddSectionMenu = Update.foldChild({
   update: AddSectionMenu.update,
   read: (model: Model) => Option.some(model.addSectionMenu),
   write: (model, nextAddSectionMenu) =>
     evo(model, { addSectionMenu: () => nextAddSectionMenu }),
-  toParentMessage: message => Message.GotAddSectionMenuMessage({ message }),
+  toParentMessage: (message: Menu.Message): Message =>
+    Message.GotAddSectionMenuMessage({ message }),
   toParentOutMessage: () => Option.none(),
   foldOutMessage: foldAddSectionMenuOutMessage,
+})
+
+const readChordMenu = (model: Model): Option.Option<Menu.Model> =>
+  Option.some(model.chordMenu)
+
+const writeChordMenu = (model: Model, nextChordMenu: Menu.Model): Model =>
+  evo(model, { chordMenu: () => nextChordMenu })
+
+const toGotChordMenuMessage = (message: Menu.Message): Message =>
+  Message.GotChordMenuMessage({ message })
+
+const foldChordMenuOutMessage = M.type<Menu.OutMessage<string>>().pipe(
+  M.withReturnType<Update.Step<Model, Message>>(),
+  M.tagsExhaustive({
+    Selected: () => model => [model, []],
+  }),
+)
+
+const foldChordMenu = Update.foldChild({
+  update: ChordMenu.update,
+  read: readChordMenu,
+  write: writeChordMenu,
+  toParentMessage: toGotChordMenuMessage,
+  toParentOutMessage: () => Option.none(),
+  foldOutMessage: foldChordMenuOutMessage,
+})
+
+const foldChordMenuOpen = Update.foldChildStep({
+  update: ChordMenu.open,
+  read: readChordMenu,
+  write: writeChordMenu,
+  toParentMessage: toGotChordMenuMessage,
+  foldOutMessage: foldChordMenuOutMessage,
+})
+
+const foldChordMenuClose = Update.foldChildStep({
+  update: ChordMenu.close,
+  read: readChordMenu,
+  write: writeChordMenu,
+  toParentMessage: toGotChordMenuMessage,
+  foldOutMessage: foldChordMenuOutMessage,
 })
 
 const foldDragAndDropOutMessage =
@@ -98,87 +141,102 @@ const foldSectionDragAndDrop = (previousModel: Model) =>
     read: (model: Model) => Option.some(model.sectionDragAndDrop),
     write: (model, nextSectionDragAndDrop) =>
       evo(model, { sectionDragAndDrop: () => nextSectionDragAndDrop }),
-    toParentMessage: message =>
+    toParentMessage: (message: DragAndDrop.Message): Message =>
       Message.GotSectionDragAndDropMessage({ message }),
     toParentOutMessage: () => Option.none(),
     foldOutMessage: foldDragAndDropOutMessage(previousModel),
   })
 
-const foldDeleteSectionDialogOutMessage = (
-  outMessage: Dialog.OutMessage,
-): Update.Step<Model, Message> =>
-  Dialog.OutMessage.match<Update.Step<Model, Message>>(outMessage, {
+const readDeleteSectionDialog = (model: Model): Option.Option<Dialog.Model> =>
+  Option.some(model.deleteSectionDialog)
+
+const writeDeleteSectionDialog = (
+  model: Model,
+  nextDeleteSectionDialog: Dialog.Model,
+): Model => evo(model, { deleteSectionDialog: () => nextDeleteSectionDialog })
+
+const toGotDeleteSectionDialogMessage = (message: Dialog.Message): Message =>
+  Message.GotDeleteSectionDialogMessage({ message })
+
+const foldDeleteSectionDialogOutMessage = M.type<Dialog.OutMessage>().pipe(
+  M.withReturnType<Update.Step<Model, Message>>(),
+  M.tagsExhaustive({
     Opened: () => model => [model, []],
     Closed: () => model => [
       evo(model, { maybePendingDeleteSectionId: () => Option.none() }),
       [],
     ],
-  })
+  }),
+)
 
 const foldDeleteSectionDialog = Update.foldChild({
   update: Dialog.update,
-  read: (model: Model) => Option.some(model.deleteSectionDialog),
-  write: (model, nextDeleteSectionDialog) =>
-    evo(model, { deleteSectionDialog: () => nextDeleteSectionDialog }),
-  toParentMessage: message =>
-    Message.GotDeleteSectionDialogMessage({ message }),
+  read: readDeleteSectionDialog,
+  write: writeDeleteSectionDialog,
+  toParentMessage: toGotDeleteSectionDialogMessage,
   toParentOutMessage: () => Option.none(),
   foldOutMessage: foldDeleteSectionDialogOutMessage,
 })
 
-const commitPlacing =
-  (model: Model) =>
-  (placing: PlacingChord): UpdateReturn => {
-    const name = pipe(placing.draft, Str.trim)
+const foldDeleteSectionDialogOpen = Update.foldChildStep({
+  update: Dialog.open,
+  read: readDeleteSectionDialog,
+  write: writeDeleteSectionDialog,
+  toParentMessage: toGotDeleteSectionDialogMessage,
+  foldOutMessage: foldDeleteSectionDialogOutMessage,
+})
 
-    if (pipe(name, Str.isEmpty)) {
-      return Option.match(placing.maybeMarkId, {
-        onNone: () => [
-          evo(model, { mode: () => Viewing() }),
-          [],
-          Option.none(),
-        ],
-        onSome: markId => {
-          const song = Song.updateLine(model.song, placing.lineId, line =>
-            Line.removeMark(line, markId),
-          )
-          return emitSong(model, song)
-        },
-      })
-    }
+const foldDeleteSectionDialogClose = Update.foldChildStep({
+  update: Dialog.close,
+  read: readDeleteSectionDialog,
+  write: writeDeleteSectionDialog,
+  toParentMessage: toGotDeleteSectionDialogMessage,
+  foldOutMessage: foldDeleteSectionDialogOutMessage,
+})
 
+const commitChord = (
+  model: Model,
+  placing: PlacingChord,
+  name: string,
+): UpdateReturn => {
+  if (pipe(name, Str.isEmpty)) {
     return Option.match(placing.maybeMarkId, {
+      onNone: () => [evo(model, { mode: () => Viewing() }), [], Option.none()],
       onSome: markId => {
         const song = Song.updateLine(model.song, placing.lineId, line =>
-          Line.updateMarkName(line, markId, name),
+          Line.removeMark(line, markId),
         )
         return emitSong(model, song)
       },
-      onNone: () => [
-        model,
-        [
-          GenerateEditorIds({
-            count: 1,
-            request: NewMarkRequest({
-              lineId: placing.lineId,
-              at: placing.at,
-              name,
-            }),
-          }),
-        ],
-        Option.none(),
-      ],
     })
   }
 
-const whenPlacingChord =
-  (model: Model, onPlacing: (placing: PlacingChord) => UpdateReturn) =>
-  (): UpdateReturn =>
-    M.value(model.mode).pipe(
-      withUpdateReturn,
-      M.tag('PlacingChord', onPlacing),
-      M.orElse(() => [model, [], Option.none()]),
-    )
+  return Option.match(placing.maybeMarkId, {
+    onSome: markId => {
+      const song = Song.addChord(
+        Song.updateLine(model.song, placing.lineId, line =>
+          Line.updateMarkName(line, markId, name),
+        ),
+        name,
+      )
+      return emitSong(model, song)
+    },
+    onNone: () => [
+      evo(model, { song: () => Song.addChord(model.song, name) }),
+      [
+        GenerateEditorIds({
+          count: 1,
+          request: NewMarkRequest({
+            lineId: placing.lineId,
+            at: placing.at,
+            name,
+          }),
+        }),
+      ],
+      Option.none(),
+    ],
+  })
+}
 
 const applyLyricsDraft = (
   model: Model,
@@ -256,18 +314,19 @@ export const update = (model: Model, message: Message): UpdateReturn =>
     ClickedEditLyrics: ({ sectionId }) =>
       Option.match(Song.findSection(model.song, sectionId), {
         onNone: () => [model, [], Option.none()],
-        onSome: section => [
-          evo(model, {
-            mode: () =>
-              EditingLyrics({
-                sectionId,
-                draft: Section.lyricsText(section),
-                backupLines: section.lines,
-              }),
-          }),
-          [],
-          Option.none(),
-        ],
+        onSome: section => {
+          const [nextModel, commands] = foldChordMenuClose(
+            evo(model, {
+              mode: () =>
+                EditingLyrics({
+                  sectionId,
+                  draft: Section.lyricsText(section),
+                  backupLines: section.lines,
+                }),
+            }),
+          )
+          return [nextModel, commands, Option.none()]
+        },
       }),
 
     UpdatedLyricsDraft: ({ value }) =>
@@ -318,47 +377,49 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         Song.findLine(model.song, lineId),
         Option.flatMap(line => Line.markAt(line, at)),
       )
-
-      return [
+      const [nextModel, commands] = foldChordMenuOpen(
         evo(model, {
           mode: () =>
             PlacingChord({
               lineId,
               at,
-              draft: Option.match(maybeMark, {
-                onNone: () => '',
-                onSome: ({ name }) => name,
-              }),
               maybeMarkId: Option.map(maybeMark, ({ id }) => id),
             }),
         }),
-        [FocusChordDraft()],
-        Option.none(),
-      ]
+      )
+      return [nextModel, commands, Option.none()]
     },
 
-    UpdatedChordDraft: ({ value }) =>
-      M.value(model.mode).pipe(
-        withUpdateReturn,
-        M.tag('PlacingChord', placing => [
-          evo(model, {
-            mode: () => evo(placing, { draft: () => value }),
-          }),
-          [],
-          Option.none(),
-        ]),
-        M.orElse(() => [model, [], Option.none()]),
-      ),
-
-    BlurredChordDraft: () => whenPlacingChord(model, commitPlacing(model))(),
-
-    PressedCommitChord: () => whenPlacingChord(model, commitPlacing(model))(),
-
-    PressedCancelChord: () => [
-      evo(model, { mode: () => Viewing() }),
+    UpdatedPaletteDraft: ({ value }) => [
+      evo(model, { paletteDraft: () => value }),
       [],
       Option.none(),
     ],
+
+    SubmittedPaletteChord: () => {
+      const name = pipe(model.paletteDraft, Str.trim)
+      if (pipe(name, Str.isEmpty)) {
+        return [evo(model, { paletteDraft: () => '' }), [], Option.none()]
+      }
+
+      const nextModel = evo(model, {
+        song: () => Song.addChord(model.song, name),
+        paletteDraft: () => '',
+      })
+
+      return M.value(model.mode).pipe(
+        withUpdateReturn,
+        M.tag('PlacingChord', placing => commitChord(nextModel, placing, name)),
+        M.orElse(() => [
+          nextModel,
+          [],
+          Option.some(OutMessage.UpdatedSong({ song: nextModel.song })),
+        ]),
+      )
+    },
+
+    ClickedRemovePaletteChord: ({ name }) =>
+      emitSongKeepMode(model, Song.removeChord(model.song, name)),
 
     ClickedRemoveSection: ({ sectionId }) =>
       Array.match(model.song.sections, {
@@ -367,53 +428,37 @@ export const update = (model: Model, message: Message): UpdateReturn =>
           Array.match(Array.drop(sections, 1), {
             onEmpty: () => [model, [], Option.none()],
             onNonEmpty: () => {
-              const [nextDialog, dialogCommands] = Dialog.open(
-                model.deleteSectionDialog,
-              )
-              return [
+              const [nextModel, commands] = foldDeleteSectionDialogOpen(
                 evo(model, {
-                  deleteSectionDialog: () => nextDialog,
                   maybePendingDeleteSectionId: () => Option.some(sectionId),
                 }),
-                Command.mapMessages(dialogCommands, dialogMessage =>
-                  Message.GotDeleteSectionDialogMessage({
-                    message: dialogMessage,
-                  }),
-                ),
-                Option.none(),
-              ]
+              )
+              return [nextModel, commands, Option.none()]
             },
           }),
       }),
 
-    ClickedConfirmRemoveSection: () => {
-      const [nextDialog, dialogCommands] = Dialog.close(
-        model.deleteSectionDialog,
-      )
-      const mapped = Command.mapMessages(dialogCommands, dialogMessage =>
-        Message.GotDeleteSectionDialogMessage({ message: dialogMessage }),
-      )
-
-      return Option.match(model.maybePendingDeleteSectionId, {
-        onNone: () => [
-          evo(model, { deleteSectionDialog: () => nextDialog }),
-          mapped,
-          Option.none(),
-        ],
+    ClickedConfirmRemoveSection: () =>
+      Option.match(model.maybePendingDeleteSectionId, {
+        onNone: () => {
+          const [nextModel, commands] = foldDeleteSectionDialogClose(model)
+          return [nextModel, commands, Option.none()]
+        },
         onSome: sectionId => {
           const song = Song.removeSection(model.song, sectionId)
-          return [
+          const [nextModel, commands] = foldDeleteSectionDialogClose(
             evo(model, {
               song: () => song,
-              deleteSectionDialog: () => nextDialog,
               maybePendingDeleteSectionId: () => Option.none(),
             }),
-            mapped,
+          )
+          return [
+            nextModel,
+            commands,
             Option.some(OutMessage.UpdatedSong({ song })),
           ]
         },
-      })
-    },
+      }),
 
     ClickedDuplicateSection: ({ sectionId }) =>
       Option.match(Song.findSection(model.song, sectionId), {
@@ -432,11 +477,56 @@ export const update = (model: Model, message: Message): UpdateReturn =>
 
     CompletedGenerateEditorIds: handleCompletedGenerateEditorIds(model),
 
-    CompletedFocusChordDraft: () => [model, [], Option.none()],
+    GotAddSectionMenuMessage: ({ message }) =>
+      foldAddSectionMenu(model, message),
 
-    GotAddSectionMenuMessage: ({ message }) => {
-      const [nextModel, commands] = foldAddSectionMenu(model, message)
-      return [nextModel, commands, Option.none()]
+    GotChordMenuMessage: ({ message }) => {
+      const [nextModel, commands] = foldChordMenu(model, message)
+
+      return M.value(message).pipe(
+        withUpdateReturn,
+        M.tag('SelectedItem', ({ item }) =>
+          M.value(nextModel.mode).pipe(
+            withUpdateReturn,
+            M.tag('PlacingChord', placing => {
+              if (item === CHORD_MENU_EMPTY) {
+                return [
+                  evo(nextModel, { mode: () => Viewing() }),
+                  commands,
+                  Option.none(),
+                ]
+              }
+
+              if (item === CHORD_MENU_CLEAR) {
+                const [placed, placeCommands, out] = commitChord(
+                  nextModel,
+                  placing,
+                  '',
+                )
+                return [placed, [...commands, ...placeCommands], out]
+              }
+
+              const [placed, placeCommands, out] = commitChord(
+                nextModel,
+                placing,
+                item,
+              )
+              return [placed, [...commands, ...placeCommands], out]
+            }),
+            M.orElse(() => [nextModel, commands, Option.none()]),
+          ),
+        ),
+        M.tag('Closed', () =>
+          nextModel.mode._tag === 'PlacingChord'
+            ? [
+                evo(nextModel, { mode: () => Viewing() }),
+                commands,
+                Option.none(),
+              ]
+            : [nextModel, commands, Option.none()],
+        ),
+        M.orElse(() => [nextModel, commands, Option.none()]),
+      )
     },
 
     GotSectionDragAndDropMessage: ({ message }) => {
@@ -451,8 +541,6 @@ export const update = (model: Model, message: Message): UpdateReturn =>
       return [nextModel, commands, maybeSongChanged]
     },
 
-    GotDeleteSectionDialogMessage: ({ message }) => {
-      const [nextModel, commands] = foldDeleteSectionDialog(model, message)
-      return [nextModel, commands, Option.none()]
-    },
+    GotDeleteSectionDialogMessage: ({ message }) =>
+      foldDeleteSectionDialog(model, message),
   })

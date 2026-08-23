@@ -10,9 +10,11 @@ import {
 import { evo } from 'foldkit/struct'
 import { describe, expect, test } from 'vitest'
 
+import { Menu } from '@foldkit/ui'
+
 import { Line, Song } from '../../domain'
-import { FocusChordDraft } from './command'
-import { Message, OutMessage } from './message'
+import { GenerateEditorIds } from './command'
+import { Message, NewMarkRequest, OutMessage } from './message'
 import { init } from './model'
 import { update } from './update'
 
@@ -63,12 +65,55 @@ describe('editor', () => {
       update,
       given(editorModel),
       message(Message.ClickedWord({ lineId: 'line-1', at: 0 })),
-      Command.expectExact(FocusChordDraft()),
-      Command.resolve(FocusChordDraft, Message.CompletedFocusChordDraft()),
       expectNoOutMessage(),
+      Command.resolve(Menu.FocusItems, Menu.Message.CompletedFocusItems()),
       model(current => {
         expect(current.mode._tag).toBe('PlacingChord')
+        expect(current.chordMenu.isOpen).toBe(true)
       }),
+    )
+  })
+
+  test('adding a song chord and tapping it places the mark', () => {
+    story(
+      update,
+      given(editorModel),
+      message(Message.UpdatedPaletteDraft({ value: 'G' })),
+      message(Message.SubmittedPaletteChord()),
+      expectOutMessage(
+        OutMessage.UpdatedSong({
+          song: evo(song, { chords: () => ['G'] }),
+        }),
+      ),
+      message(Message.ClickedWord({ lineId: 'line-1', at: 0 })),
+      Command.resolve(Menu.FocusItems, Menu.Message.CompletedFocusItems()),
+      message(
+        Message.GotChordMenuMessage({
+          message: Menu.Message.SelectedItem({ index: 0, item: 'G' }),
+        }),
+      ),
+      Command.resolve(Menu.FocusButton, Menu.Message.CompletedFocusButton()),
+      Command.expectExact(
+        GenerateEditorIds({
+          count: 1,
+          request: NewMarkRequest({
+            lineId: 'line-1',
+            at: 0,
+            name: 'G',
+          }),
+        }),
+      ),
+      Command.resolve(
+        GenerateEditorIds,
+        Message.CompletedGenerateEditorIds({
+          ids: ['mark-1'],
+          request: NewMarkRequest({
+            lineId: 'line-1',
+            at: 0,
+            name: 'G',
+          }),
+        }),
+      ),
     )
   })
 })

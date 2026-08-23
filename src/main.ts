@@ -5,13 +5,14 @@ import { Url } from 'foldkit/url'
 
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 
-import { SavedLibrary, SavedLibraryJsonString } from './command'
-import { STORAGE_KEY } from './constant'
+import { ApplyTheme, SavedLibrary, SavedLibraryJsonString } from './command'
+import { STORAGE_KEY, THEME_STORAGE_KEY } from './constant'
 import { Song } from './domain'
-import { Message } from './message'
+import { Message, ResolvedTheme, ThemePreference } from './message'
 import { Model } from './model'
 import { Editor, Home, Play } from './page'
 import { urlToAppRoute } from './route'
+import { resolveTheme } from './theme'
 import { Toast } from './toast'
 
 export { Message, Model }
@@ -21,23 +22,40 @@ export { subscriptions } from './subscription'
 
 export const Flags = S.Struct({
   maybeSavedLibrary: S.Option(SavedLibrary),
+  maybeThemePreference: S.Option(ThemePreference),
+  systemTheme: ResolvedTheme,
 })
 
 export type Flags = typeof Flags.Type
 
-export const flags: Effect.Effect<Flags> = Effect.gen(function* () {
+const loadSavedLibrary = Effect.gen(function* () {
   const store = yield* KeyValueStore.KeyValueStore
   const json = yield* Effect.fromOption(
     Option.fromNullishOr(yield* store.get(STORAGE_KEY)),
   )
   const decoded = yield* S.decodeEffect(SavedLibraryJsonString)(json)
-  return Flags.make({ maybeSavedLibrary: Option.some(decoded) })
-}).pipe(
-  Effect.catch(() =>
-    Effect.succeed(Flags.make({ maybeSavedLibrary: Option.none() })),
-  ),
-  Effect.provide(BrowserKeyValueStore.layerLocalStorage),
-)
+  return Option.some(decoded)
+}).pipe(Effect.catch(() => Effect.succeed(Option.none<SavedLibrary>())))
+
+const loadThemePreference = Effect.gen(function* () {
+  const store = yield* KeyValueStore.KeyValueStore
+  const json = yield* Effect.fromOption(
+    Option.fromNullishOr(yield* store.get(THEME_STORAGE_KEY)),
+  )
+  const theme = yield* S.decodeEffect(S.fromJsonString(ThemePreference))(json)
+  return Option.some(theme)
+}).pipe(Effect.catch(() => Effect.succeed(Option.none<ThemePreference>())))
+
+export const flags: Effect.Effect<Flags> = Effect.gen(function* () {
+  const maybeSavedLibrary = yield* loadSavedLibrary
+  const maybeThemePreference = yield* loadThemePreference
+  const systemTheme: ResolvedTheme = yield* Effect.sync(() =>
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'Dark'
+      : 'Light',
+  )
+  return Flags.make({ maybeSavedLibrary, maybeThemePreference, systemTheme })
+}).pipe(Effect.provide(BrowserKeyValueStore.layerLocalStorage))
 
 export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
   flags,
@@ -60,6 +78,11 @@ export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
   )
   const [editor] = Editor.init(currentSong)
   const [play] = Play.init(currentSong)
+  const themePreference: ThemePreference = Option.getOrElse(
+    flags.maybeThemePreference,
+    () => 'System',
+  )
+  const resolvedTheme = resolveTheme(themePreference, flags.systemTheme)
 
   return [
     {
@@ -70,7 +93,10 @@ export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
       play,
       toast: Toast.init({ id: 'app-toast' }),
       maybePendingEditSongId: Option.none(),
+      maybeThemePreference: Option.some(themePreference),
+      systemTheme: flags.systemTheme,
+      resolvedTheme,
     },
-    [],
+    [ApplyTheme({ theme: resolvedTheme })],
   ]
 }

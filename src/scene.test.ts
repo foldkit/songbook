@@ -1,12 +1,30 @@
 import { Option } from 'effect'
-import { Command, click, expect, given, role, scene, text } from 'foldkit/scene'
+import {
+  Command,
+  click,
+  expect,
+  given,
+  role,
+  scene,
+  selector,
+  text,
+} from 'foldkit/scene'
+import { evo } from 'foldkit/struct'
 import { describe, test } from 'vitest'
 
-import { GenerateSongIds, NavigateInternal, SaveLibrary } from './command'
+import {
+  ApplyTheme,
+  GenerateSongIds,
+  NavigateInternal,
+  SaveLibrary,
+  SaveThemePreference,
+} from './command'
+import { SECTIONS_CONTAINER_ID } from './constant'
+import { Song } from './domain'
 import { Message } from './message'
 import type { Model } from './model'
 import { Editor, Home, Play } from './page'
-import { HomeRoute } from './route'
+import { HomeRoute, SongEditRoute } from './route'
 import { Toast } from './toast'
 import { update } from './update'
 import { view } from './view'
@@ -19,6 +37,9 @@ const emptyModel: Model = {
   play: Play.init(Play.placeholderSong)[0],
   toast: Toast.init({ id: 'app-toast' }),
   maybePendingEditSongId: Option.none(),
+  maybeThemePreference: Option.some('System'),
+  systemTheme: 'Light',
+  resolvedTheme: 'Light',
 }
 
 describe('library view', () => {
@@ -41,6 +62,63 @@ describe('library view', () => {
       ),
       Command.resolve(SaveLibrary, Message.SucceededSaveLibrary()),
       Command.resolve(NavigateInternal, Message.CompletedNavigateInternal()),
+    )
+  })
+
+  test('theme selector switches to dark mode', () => {
+    scene(
+      { update, view },
+      given(emptyModel),
+      expect(role('group', { name: 'Theme preference' })).toExist(),
+      expect(role('button', { name: 'System mode' })).toHaveAttr(
+        'aria-pressed',
+        'true',
+      ),
+      click(role('button', { name: 'Dark mode' })),
+      Command.resolve(ApplyTheme, Message.CompletedApplyTheme()),
+      Command.resolve(
+        SaveThemePreference,
+        Message.CompletedSaveThemePreference(),
+      ),
+      expect(role('button', { name: 'Dark mode' })).toHaveAttr(
+        'aria-pressed',
+        'true',
+      ),
+      expect(role('button', { name: 'System mode' })).toHaveAttr(
+        'aria-pressed',
+        'false',
+      ),
+    )
+  })
+
+  test('the shell marks itself as dragging while a section is moved', () => {
+    const song = Song.create('song-1', 'section-1')
+    const [editor] = Editor.init(song)
+    const dragging: Model = evo(emptyModel, {
+      route: () => SongEditRoute({ songId: song.id }),
+      songs: () => [song],
+      editor: () =>
+        evo(editor, {
+          sectionDragAndDrop: dnd =>
+            evo(dnd, {
+              dragState: () => ({
+                _tag: 'Dragging',
+                itemId: 'section-1',
+                sourceContainerId: SECTIONS_CONTAINER_ID,
+                sourceIndex: 0,
+                origin: { screenX: 0, screenY: 0 },
+                current: { clientX: 10, clientY: 10 },
+                maybeDropTarget: Option.none(),
+              }),
+            }),
+        }),
+    })
+
+    scene(
+      { update, view },
+      given(dragging),
+      expect(selector('.is-dragging')).toExist(),
+      expect(role('link', { name: 'Library' })).toExist(),
     )
   })
 })

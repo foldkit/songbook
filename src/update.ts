@@ -1,19 +1,22 @@
 import { Match as M, Option } from 'effect'
-import { Command, Update } from 'foldkit'
+import { Update } from 'foldkit'
 import { evo } from 'foldkit/struct'
 import { Url, toString as urlToString } from 'foldkit/url'
 
 import {
+  ApplyTheme,
   GenerateSongIds,
   LoadExternal,
   NavigateInternal,
   SaveLibrary,
+  SaveThemePreference,
 } from './command'
 import { Song } from './domain'
 import { Message } from './message'
 import { Model } from './model'
 import { Editor, Home, Play } from './page'
 import { songEditRouter, urlToAppRoute } from './route'
+import { resolveTheme } from './theme'
 import { Toast } from './toast'
 
 type UpdateReturn = Update.Return<Model, Message>
@@ -23,24 +26,46 @@ const saveSongs =
   (songs: ReadonlyArray<Song.Song>): Update.Step<Model, Message> =>
   model => [evo(model, { songs: () => songs }), [SaveLibrary({ songs })]]
 
-const showToast =
-  (
-    variant: 'Success' | 'Error',
-    title: string,
-    maybeDescription: Option.Option<string> = Option.none(),
-  ): Update.Step<Model, Message> =>
-  model => {
-    const [nextToast, toastCommands] = Toast.show(model.toast, {
-      variant,
-      payload: { title, maybeDescription },
-    })
-    return [
-      evo(model, { toast: () => nextToast }),
-      Command.mapMessages(toastCommands, message =>
-        Message.GotToastMessage({ message }),
-      ),
-    ]
-  }
+const readToast = (model: Model) => Option.some(model.toast)
+
+const writeToast = (model: Model, nextToast: Model['toast']): Model =>
+  evo(model, { toast: () => nextToast })
+
+const toGotToastMessage = (message: typeof Toast.Message.Type): Message =>
+  Message.GotToastMessage({ message })
+
+const foldToastOutMessage = M.type<typeof Toast.OutMessage.Type>().pipe(
+  M.withReturnType<Update.Step<Model, Message>>(),
+  M.tagsExhaustive({
+    DismissedToast: () => model => [model, []],
+  }),
+)
+
+const foldToast = Update.foldChild({
+  update: Toast.update,
+  read: readToast,
+  write: writeToast,
+  toParentMessage: toGotToastMessage,
+  foldOutMessage: foldToastOutMessage,
+})
+
+const foldToastShow = Update.foldChild({
+  update: Toast.show,
+  read: readToast,
+  write: writeToast,
+  toParentMessage: toGotToastMessage,
+  foldOutMessage: foldToastOutMessage,
+})
+
+const showToast = (
+  variant: 'Success' | 'Error',
+  title: string,
+  maybeDescription: Option.Option<string> = Option.none(),
+): Update.Step<Model, Message> =>
+  foldToastShow({
+    variant,
+    payload: { title, maybeDescription },
+  })
 
 const foldHomeOutMessage = (
   outMessage: Home.OutMessage,
@@ -126,14 +151,6 @@ const foldPlay = Update.foldChild({
   foldOutMessage: foldPlayOutMessage,
 })
 
-const foldToast = Update.foldChild({
-  update: Toast.update,
-  read: (model: Model) => Option.some(model.toast),
-  write: (model, nextToast) => evo(model, { toast: () => nextToast }),
-  toParentMessage: message => Message.GotToastMessage({ message }),
-  foldOutMessage: () => model => [model, []],
-})
-
 const loadSongPages =
   (songId: string): Update.Step<Model, Message> =>
   model =>
@@ -209,6 +226,39 @@ export const update = (model: Model, message: Message) =>
         evo(model, { maybePendingEditSongId: () => Option.none() }),
         [showToast('Error', error)],
       ),
+
+    CompletedApplyTheme: () => [model, []],
+    CompletedSaveThemePreference: () => [model, []],
+
+    SelectedThemePreference: ({ preference }) => {
+      const resolvedTheme = resolveTheme(preference, model.systemTheme)
+
+      return [
+        evo(model, {
+          maybeThemePreference: () => Option.some(preference),
+          resolvedTheme: () => resolvedTheme,
+        }),
+        [
+          ApplyTheme({ theme: resolvedTheme }),
+          SaveThemePreference({ preference }),
+        ],
+      ]
+    },
+
+    ChangedSystemTheme: ({ theme }) => {
+      const resolvedTheme = resolveTheme(
+        Option.getOrElse(model.maybeThemePreference, () => 'System'),
+        theme,
+      )
+
+      return [
+        evo(model, {
+          systemTheme: () => theme,
+          resolvedTheme: () => resolvedTheme,
+        }),
+        [ApplyTheme({ theme: resolvedTheme })],
+      ]
+    },
 
     GotHomeMessage: ({ message }) => foldHome(model, message),
     GotEditorMessage: ({ message }) => foldEditor(model, message),

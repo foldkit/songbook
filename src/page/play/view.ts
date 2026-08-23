@@ -31,7 +31,10 @@ const metaLineView = (song: Song.Song, h: HtmlBuilder<Message>): Html => {
   return Array.match(parts, {
     onEmpty: () => h.empty,
     onNonEmpty: items =>
-      h.p([h.Class('text-sm text-stone-500')], [Array.join(items, ' · ')]),
+      h.p(
+        [h.Class('text-sm text-stone-500 dark:text-stone-400')],
+        [Array.join(items, ' · ')],
+      ),
   })
 }
 
@@ -136,7 +139,7 @@ export const view = Submodel.defineView<Model, Message>((model, h) =>
       h.pre(
         [
           h.Class(
-            'overflow-x-auto whitespace-pre-wrap rounded-lg border border-stone-200 bg-white p-6 font-mono text-base leading-7 text-stone-900',
+            'overflow-x-auto whitespace-pre-wrap rounded-lg border border-stone-200 bg-white p-6 font-mono text-base leading-7 text-stone-900 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100',
           ),
           h.AriaLabel('Chord chart'),
         ],
