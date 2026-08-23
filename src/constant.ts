@@ -1,10 +1,6 @@
 export const STORAGE_KEY = 'coverchart-library'
 
-export const LEGACY_STORAGE_KEY = 'songbook-library'
-
 export const THEME_STORAGE_KEY = 'coverchart-theme-preference'
-
-export const LEGACY_THEME_STORAGE_KEY = 'songbook-theme-preference'
 
 // NOTE: mirrors Tailwind stone-50 and stone-950. Keep in sync with
 // public/theme-init.js and the theme-color meta in index.html.

@@ -1,7 +1,5 @@
 ;(function () {
-  var pref =
-    localStorage.getItem('coverchart-theme-preference') ||
-    localStorage.getItem('songbook-theme-preference')
+  var pref = localStorage.getItem('coverchart-theme-preference')
   var theme = pref ? JSON.parse(pref) : 'System'
   var isDark =
     theme === 'Dark' ||
