@@ -131,18 +131,18 @@ const songPageView = (
 const documentTitle = (model: Model): string =>
   M.value(model.route).pipe(
     M.tagsExhaustive({
-      Home: () => 'Songbook',
+      Home: () => 'Coverchart',
       SongEdit: ({ songId }) =>
         Option.match(Song.findById(model.songs, songId), {
-          onNone: () => 'Song not found · Songbook',
+          onNone: () => 'Song not found · Coverchart',
           onSome: song => `${Song.displayTitle(song)} · Edit`,
         }),
       SongPlay: ({ songId }) =>
         Option.match(Song.findById(model.songs, songId), {
-          onNone: () => 'Song not found · Songbook',
+          onNone: () => 'Song not found · Coverchart',
           onSome: song => `${Song.displayTitle(song)} · Play`,
         }),
-      NotFound: () => 'Not found · Songbook',
+      NotFound: () => 'Not found · Coverchart',
     }),
   )
 

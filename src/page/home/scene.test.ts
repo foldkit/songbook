@@ -15,7 +15,7 @@ describe('home view', () => {
     scene(
       { update, view: withViewInputs(view, { songs: [untitled] })() },
       given(home),
-      expect(role('heading', { name: 'Songbook' })).toExist(),
+      expect(role('heading', { name: 'Coverchart' })).toExist(),
       expect(role('link', { name: 'Untitled' })).toExist(),
       expect(role('link', { name: 'Edit' })).toExist(),
       expect(role('link', { name: 'Play' })).toExist(),

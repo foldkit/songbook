@@ -1,4 +1,4 @@
-# Songbook
+# Coverchart
 
 A Foldkit app for writing chord charts with lyrics.
 
@@ -6,7 +6,7 @@ A Foldkit app for writing chord charts with lyrics.
 
 - Keep a library of songs in this browser (`localStorage`)
 - Paste lyrics into named sections (Verse, Chorus, Bridge, …)
-- Click a word and type a chord so it sits above that word
+- Add chords to a song, then tap a word to place one above it
 - Open a play view with large type, transpose, and capo (display only — stored chords stay in the original key)
 - Copy a text chart you can paste elsewhere
 

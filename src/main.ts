@@ -1,4 +1,4 @@
-import { Effect, Match as M, Option, Schema as S } from 'effect'
+import { Array, Effect, Match as M, Option, Schema as S } from 'effect'
 import { KeyValueStore } from 'effect/unstable/persistence'
 import { Runtime } from 'foldkit'
 import { Url } from 'foldkit/url'
@@ -6,7 +6,12 @@ import { Url } from 'foldkit/url'
 import { BrowserKeyValueStore } from '@effect/platform-browser'
 
 import { ApplyTheme, SavedLibrary, SavedLibraryJsonString } from './command'
-import { STORAGE_KEY, THEME_STORAGE_KEY } from './constant'
+import {
+  LEGACY_STORAGE_KEY,
+  LEGACY_THEME_STORAGE_KEY,
+  STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from './constant'
 import { Song } from './domain'
 import { Message, ResolvedTheme, ThemePreference } from './message'
 import { Model } from './model'
@@ -28,20 +33,33 @@ export const Flags = S.Struct({
 
 export type Flags = typeof Flags.Type
 
+const loadStoredJson = (keys: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const store = yield* KeyValueStore.KeyValueStore
+    return yield* Effect.firstSuccessOf(
+      Array.map(keys, key =>
+        store
+          .get(key)
+          .pipe(
+            Effect.flatMap(value =>
+              Effect.fromOption(Option.fromNullishOr(value)),
+            ),
+          ),
+      ),
+    )
+  })
+
 const loadSavedLibrary = Effect.gen(function* () {
-  const store = yield* KeyValueStore.KeyValueStore
-  const json = yield* Effect.fromOption(
-    Option.fromNullishOr(yield* store.get(STORAGE_KEY)),
-  )
+  const json = yield* loadStoredJson([STORAGE_KEY, LEGACY_STORAGE_KEY])
   const decoded = yield* S.decodeEffect(SavedLibraryJsonString)(json)
   return Option.some(decoded)
 }).pipe(Effect.catch(() => Effect.succeed(Option.none<SavedLibrary>())))
 
 const loadThemePreference = Effect.gen(function* () {
-  const store = yield* KeyValueStore.KeyValueStore
-  const json = yield* Effect.fromOption(
-    Option.fromNullishOr(yield* store.get(THEME_STORAGE_KEY)),
-  )
+  const json = yield* loadStoredJson([
+    THEME_STORAGE_KEY,
+    LEGACY_THEME_STORAGE_KEY,
+  ])
   const theme = yield* S.decodeEffect(S.fromJsonString(ThemePreference))(json)
   return Option.some(theme)
 }).pipe(Effect.catch(() => Effect.succeed(Option.none<ThemePreference>())))

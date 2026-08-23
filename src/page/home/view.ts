@@ -217,7 +217,7 @@ export const view = Submodel.defineView<Model, Message, ViewInputs>(
             h.div(
               [h.Class('flex flex-col gap-1')],
               [
-                h.h1([h.Class(className.heading)], ['Songbook']),
+                h.h1([h.Class(className.heading)], ['Coverchart']),
                 h.p(
                   [h.Class(className.subheading)],
                   [

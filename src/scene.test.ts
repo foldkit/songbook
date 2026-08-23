@@ -47,7 +47,7 @@ describe('library view', () => {
     scene(
       { update, view },
       given(emptyModel),
-      expect(role('heading', { name: 'Songbook' })).toExist(),
+      expect(role('heading', { name: 'Coverchart' })).toExist(),
       expect(role('button', { name: 'New song' })).toExist(),
       expect(
         text('No songs yet. Start a chart and paste lyrics while you listen.'),
