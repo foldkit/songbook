@@ -1,6 +1,6 @@
 # Songbook
 
-A Foldkit app for writing chord charts with lyrics. Listen to a song in Spotify, Apple Music, or anywhere else, then get the chords and lyrics down here.
+A Foldkit app for writing chord charts with lyrics.
 
 ## What it does
 
