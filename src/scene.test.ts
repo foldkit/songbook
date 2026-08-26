@@ -32,9 +32,9 @@ import { view } from './view'
 const emptyModel: Model = {
   route: HomeRoute(),
   songs: [],
-  home: Home.init()[0],
-  editor: Editor.init(Editor.placeholderSong)[0],
-  play: Play.init(Play.placeholderSong)[0],
+  home: Home.init().model,
+  editor: Editor.init(Editor.placeholderSong).model,
+  play: Play.init(Play.placeholderSong).model,
   toast: Toast.init({ id: 'app-toast' }),
   maybePendingEditSongId: Option.none(),
   maybeThemePreference: Option.some('System'),
@@ -93,12 +93,12 @@ describe('library view', () => {
 
   test('the shell marks itself as dragging while a section is moved', () => {
     const song = Song.create('song-1', 'section-1')
-    const [editor] = Editor.init(song)
+    const editorInit = Editor.init(song)
     const dragging: Model = evo(emptyModel, {
       route: () => SongEditRoute({ songId: song.id }),
       songs: () => [song],
       editor: () =>
-        evo(editor, {
+        evo(editorInit.model, {
           sectionDragAndDrop: dnd =>
             evo(dnd, {
               dragState: () => ({

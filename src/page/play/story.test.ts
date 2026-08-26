@@ -30,13 +30,13 @@ const base = Song.updateSection(
     }),
 )
 
-const [playModel] = init(base)
+const playInit = init(base)
 
 describe('play view preferences', () => {
   test('transpose up changes display without rewriting stored chord names', () => {
     story(
       update,
-      given(playModel),
+      given(playInit.model),
       message(Message.ClickedTransposeUp()),
       model(current => {
         expect(current.song.transpose).toBe(1)
@@ -54,7 +54,7 @@ describe('play view preferences', () => {
   test('capo up displays shapes a whole step down', () => {
     story(
       update,
-      given(playModel),
+      given(playInit.model),
       message(Message.ClickedCapoUp()),
       model(current => {
         expect(current.song.capo).toBe(1)
@@ -69,7 +69,7 @@ describe('play view preferences', () => {
   test('copying the chart succeeds', () => {
     story(
       update,
-      given(playModel),
+      given(playInit.model),
       message(Message.ClickedCopyChart()),
       Command.expectExact(CopyChart({ text: Song.toChartText(base) })),
       Command.resolve(CopyChart, Message.SucceededCopyChart()),
@@ -79,7 +79,7 @@ describe('play view preferences', () => {
   test('copying the chart can fail', () => {
     story(
       update,
-      given(playModel),
+      given(playInit.model),
       message(Message.ClickedCopyChart()),
       Command.resolve(
         CopyChart,

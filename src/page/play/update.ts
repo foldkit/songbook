@@ -1,4 +1,4 @@
-import { Number, Option } from 'effect'
+import { Number } from 'effect'
 import { Update } from 'foldkit'
 import { evo } from 'foldkit/struct'
 
@@ -13,13 +13,12 @@ type UpdateReturn = Update.ReturnWithOutMessage<Model, Message, OutMessage>
 const clamp = (value: number, min: number, max: number): number =>
   Number.min(max)(Number.max(min)(value))
 
-const emitSong = (model: Model, song: Song.Song): UpdateReturn => [
-  evo(model, { song: () => song }),
-  [],
-  Option.some(OutMessage.UpdatedSong({ song })),
-]
+const emitSong = (model: Model, song: Song.Song): UpdateReturn => ({
+  model: evo(model, { song: () => song }),
+  outMessage: OutMessage.UpdatedSong({ song }),
+})
 
-export const update = (model: Model, message: Message): UpdateReturn =>
+export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
     ClickedTransposeDown: () =>
       emitSong(
@@ -55,21 +54,18 @@ export const update = (model: Model, message: Message): UpdateReturn =>
         }),
       ),
 
-    ClickedCopyChart: () => [
+    ClickedCopyChart: () => ({
       model,
-      [CopyChart({ text: Song.toChartText(model.song) })],
-      Option.none(),
-    ],
+      commands: [CopyChart({ text: Song.toChartText(model.song) })],
+    }),
 
-    SucceededCopyChart: () => [
+    SucceededCopyChart: () => ({
       model,
-      [],
-      Option.some(OutMessage.CopiedChart()),
-    ],
+      outMessage: OutMessage.CopiedChart(),
+    }),
 
-    FailedCopyChart: ({ error }) => [
+    FailedCopyChart: ({ error }) => ({
       model,
-      [],
-      Option.some(OutMessage.FailedCopy({ error })),
-    ],
+      outMessage: OutMessage.FailedCopy({ error }),
+    }),
   })

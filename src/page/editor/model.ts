@@ -1,5 +1,6 @@
 import { Option, Schema as S } from 'effect'
 import { ts } from 'foldkit/schema'
+import { evo } from 'foldkit/struct'
 
 import { Dialog, DragAndDrop, Menu } from '@foldkit/ui'
 
@@ -43,10 +44,8 @@ export const Model = S.Struct({
 
 export type Model = typeof Model.Type
 
-export const init = (
-  song: Song.Song,
-): readonly [Model, ReadonlyArray<never>] => [
-  {
+export const init = (song: Song.Song) => ({
+  model: {
     song,
     mode: Viewing(),
     paletteDraft: '',
@@ -60,10 +59,20 @@ export const init = (
     maybePendingDeleteSectionId: Option.none(),
     announcement: '',
   },
-  [],
-]
+})
 
 export const placeholderSong = Song.create(
   PLACEHOLDER_SONG_ID,
   PLACEHOLDER_SECTION_ID,
 )
+
+export const loadSong = (model: Model, song: Song.Song) =>
+  model.song.id === song.id ? { model } : init(song)
+
+export const abandonSong = (model: Model, songId: string) =>
+  model.song.id === songId ? init(placeholderSong) : { model }
+
+export const syncSong = (model: Model, song: Song.Song) =>
+  model.song.id === song.id
+    ? { model: evo(model, { song: () => song }) }
+    : { model }

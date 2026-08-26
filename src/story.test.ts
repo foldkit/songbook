@@ -20,9 +20,9 @@ import { update } from './update'
 const emptyModel: Model = {
   route: HomeRoute(),
   songs: [],
-  home: Home.init()[0],
-  editor: Editor.init(Editor.placeholderSong)[0],
-  play: Play.init(Play.placeholderSong)[0],
+  home: Home.init().model,
+  editor: Editor.init(Editor.placeholderSong).model,
+  play: Play.init(Play.placeholderSong).model,
   toast: Toast.init({ id: 'app-toast' }),
   maybePendingEditSongId: Option.none(),
   maybeThemePreference: Option.some('System'),

@@ -24,7 +24,10 @@ const withUpdateReturn = M.withReturnType<UpdateReturn>()
 
 const saveSongs =
   (songs: ReadonlyArray<Song.Song>): Update.Step<Model, Message> =>
-  model => [evo(model, { songs: () => songs }), [SaveLibrary({ songs })]]
+  model => ({
+    model: evo(model, { songs: () => songs }),
+    commands: [SaveLibrary({ songs })],
+  })
 
 const readToast = (model: Model) => Option.some(model.toast)
 
@@ -37,7 +40,7 @@ const toGotToastMessage = (message: typeof Toast.Message.Type): Message =>
 const foldToastOutMessage = M.type<typeof Toast.OutMessage.Type>().pipe(
   M.withReturnType<Update.Step<Model, Message>>(),
   M.tagsExhaustive({
-    DismissedToast: () => model => [model, []],
+    DismissedToast: () => model => ({ model }),
   }),
 )
 
@@ -71,25 +74,18 @@ const foldHomeOutMessage = (
   outMessage: Home.OutMessage,
 ): Update.Step<Model, Message> =>
   Home.OutMessage.match<Update.Step<Model, Message>>(outMessage, {
-    RequestedNewSong: () => model => [model, [GenerateSongIds()]],
+    RequestedNewSong: () => model => ({
+      model,
+      commands: [GenerateSongIds()],
+    }),
     ConfirmedDeleteSong:
       ({ songId }) =>
-      model => {
-        const songs = Song.remove(model.songs, songId)
-        const editor =
-          model.editor.song.id === songId
-            ? Editor.init(Editor.placeholderSong)[0]
-            : model.editor
-        const play =
-          model.play.song.id === songId
-            ? Play.init(Play.placeholderSong)[0]
-            : model.play
-
-        return Update.combine(
-          evo(model, { editor: () => editor, play: () => play }),
-          [saveSongs(songs)],
-        )
-      },
+      model =>
+        Update.combine(model, [
+          foldEditorAbandonSong(songId),
+          foldPlayAbandonSong(songId),
+          saveSongs(Song.remove(model.songs, songId)),
+        ]),
   })
 
 const foldHome = Update.foldChild({
@@ -100,24 +96,40 @@ const foldHome = Update.foldChild({
   foldOutMessage: foldHomeOutMessage,
 })
 
+const readEditor = (model: Model) => Option.some(model.editor)
+const writeEditor = (model: Model, nextEditor: Model['editor']): Model =>
+  evo(model, { editor: () => nextEditor })
+const toGotEditorMessage = (message: Editor.Message): Message =>
+  Message.GotEditorMessage({ message })
+
+const readPlay = (model: Model) => Option.some(model.play)
+const writePlay = (model: Model, nextPlay: Model['play']): Model =>
+  evo(model, { play: () => nextPlay })
+const toGotPlayMessage = (message: Play.Message): Message =>
+  Message.GotPlayMessage({ message })
+
+const foldEditorSyncSong = Update.foldChild({
+  update: Editor.syncSong,
+  read: readEditor,
+  write: writeEditor,
+  toParentMessage: toGotEditorMessage,
+})
+
+const foldPlaySyncSong = Update.foldChild({
+  update: Play.syncSong,
+  read: readPlay,
+  write: writePlay,
+  toParentMessage: toGotPlayMessage,
+})
+
 const syncSong =
   (song: Song.Song): Update.Step<Model, Message> =>
-  model => {
-    const songs = Song.upsert(model.songs, song)
-    const editor =
-      model.editor.song.id === song.id
-        ? evo(model.editor, { song: () => song })
-        : model.editor
-    const play =
-      model.play.song.id === song.id
-        ? evo(model.play, { song: () => song })
-        : model.play
-
-    return Update.combine(
-      evo(model, { editor: () => editor, play: () => play }),
-      [saveSongs(songs)],
-    )
-  }
+  model =>
+    Update.combine(model, [
+      foldEditorSyncSong(song),
+      foldPlaySyncSong(song),
+      saveSongs(Song.upsert(model.songs, song)),
+    ])
 
 const foldEditorOutMessage = (
   outMessage: Editor.OutMessage,
@@ -128,10 +140,24 @@ const foldEditorOutMessage = (
 
 const foldEditor = Update.foldChild({
   update: Editor.update,
-  read: (model: Model) => Option.some(model.editor),
-  write: (model, nextEditor) => evo(model, { editor: () => nextEditor }),
-  toParentMessage: message => Message.GotEditorMessage({ message }),
+  read: readEditor,
+  write: writeEditor,
+  toParentMessage: toGotEditorMessage,
   foldOutMessage: foldEditorOutMessage,
+})
+
+const foldEditorLoadSong = Update.foldChild({
+  update: Editor.loadSong,
+  read: readEditor,
+  write: writeEditor,
+  toParentMessage: toGotEditorMessage,
+})
+
+const foldEditorAbandonSong = Update.foldChild({
+  update: Editor.abandonSong,
+  read: readEditor,
+  write: writeEditor,
+  toParentMessage: toGotEditorMessage,
 })
 
 const foldPlayOutMessage = (
@@ -145,24 +171,36 @@ const foldPlayOutMessage = (
 
 const foldPlay = Update.foldChild({
   update: Play.update,
-  read: (model: Model) => Option.some(model.play),
-  write: (model, nextPlay) => evo(model, { play: () => nextPlay }),
-  toParentMessage: message => Message.GotPlayMessage({ message }),
+  read: readPlay,
+  write: writePlay,
+  toParentMessage: toGotPlayMessage,
   foldOutMessage: foldPlayOutMessage,
+})
+
+const foldPlayLoadSong = Update.foldChild({
+  update: Play.loadSong,
+  read: readPlay,
+  write: writePlay,
+  toParentMessage: toGotPlayMessage,
+})
+
+const foldPlayAbandonSong = Update.foldChild({
+  update: Play.abandonSong,
+  read: readPlay,
+  write: writePlay,
+  toParentMessage: toGotPlayMessage,
 })
 
 const loadSongPages =
   (songId: string): Update.Step<Model, Message> =>
   model =>
     Option.match(Song.findById(model.songs, songId), {
-      onNone: () => [model, []],
-      onSome: song => {
-        const editor =
-          model.editor.song.id === song.id ? model.editor : Editor.init(song)[0]
-        const play =
-          model.play.song.id === song.id ? model.play : Play.init(song)[0]
-        return [evo(model, { editor: () => editor, play: () => play }), []]
-      },
+      onNone: () => ({ model }),
+      onSome: song =>
+        Update.combine(model, [
+          foldEditorLoadSong(song),
+          foldPlayLoadSong(song),
+        ]),
     })
 
 const setRoute =
@@ -173,10 +211,10 @@ const setRoute =
       M.withReturnType<Update.Step<Model, Message>>(),
       M.tag('SongEdit', ({ songId }) => loadSongPages(songId)),
       M.tag('SongPlay', ({ songId }) => loadSongPages(songId)),
-      M.orElse(() => (currentModel: Model) => [currentModel, []]),
+      M.orElse(() => (currentModel: Model) => ({ model: currentModel })),
     )
 
-    return Update.combine(evo(model, { route: () => nextRoute }), [pageStep])
+    return pageStep(evo(model, { route: () => nextRoute }))
   }
 
 export const update = (model: Model, message: Message) =>
@@ -185,64 +223,66 @@ export const update = (model: Model, message: Message) =>
       M.value(request).pipe(
         withUpdateReturn,
         M.tagsExhaustive({
-          Internal: ({ url }) => [
+          Internal: ({ url }) => ({
             model,
-            [NavigateInternal({ url: urlToString(url) })],
-          ],
-          External: ({ href }) => [model, [LoadExternal({ href })]],
+            commands: [NavigateInternal({ url: urlToString(url) })],
+          }),
+          External: ({ href }) => ({
+            model,
+            commands: [LoadExternal({ href })],
+          }),
         }),
       ),
 
     ChangedUrl: ({ url }) => setRoute(url)(model),
 
-    CompletedNavigateInternal: () => [model, []],
-    CompletedLoadExternal: () => [model, []],
+    CompletedNavigateInternal: () => ({ model }),
+    CompletedLoadExternal: () => ({ model }),
 
     CompletedGenerateSongIds: ({ songId, sectionId }) => {
       const song = Song.create(songId, sectionId)
-      const [editor] = Editor.init(song)
-      const [play] = Play.init(song)
-      return Update.combine(
+      const editorInit = Editor.init(song)
+      const playInit = Play.init(song)
+      return saveSongs(Song.upsert(model.songs, song))(
         evo(model, {
-          editor: () => editor,
-          play: () => play,
+          editor: () => editorInit.model,
+          play: () => playInit.model,
           maybePendingEditSongId: () => Option.some(songId),
         }),
-        [saveSongs(Song.upsert(model.songs, song))],
       )
     },
 
     SucceededSaveLibrary: () =>
       Option.match(model.maybePendingEditSongId, {
-        onNone: () => [model, []],
-        onSome: songId => [
-          evo(model, { maybePendingEditSongId: () => Option.none() }),
-          [NavigateInternal({ url: songEditRouter({ songId }) })],
-        ],
+        onNone: () => ({ model }),
+        onSome: songId => ({
+          model: evo(model, { maybePendingEditSongId: () => Option.none() }),
+          commands: [NavigateInternal({ url: songEditRouter({ songId }) })],
+        }),
       }),
 
     FailedSaveLibrary: ({ error }) =>
-      Update.combine(
-        evo(model, { maybePendingEditSongId: () => Option.none() }),
-        [showToast('Error', error)],
-      ),
+      showToast(
+        'Error',
+        error,
+      )(evo(model, { maybePendingEditSongId: () => Option.none() })),
 
-    CompletedApplyTheme: () => [model, []],
-    CompletedSaveThemePreference: () => [model, []],
+    CompletedApplyTheme: () => ({ model }),
+    CompletedSaveThemePreference: () => ({ model }),
 
     SelectedThemePreference: ({ preference }) => {
       const resolvedTheme = resolveTheme(preference, model.systemTheme)
 
-      return [
-        evo(model, {
+      return {
+        model: evo(model, {
           maybeThemePreference: () => Option.some(preference),
           resolvedTheme: () => resolvedTheme,
         }),
-        [
+        commands: [
           ApplyTheme({ theme: resolvedTheme }),
           SaveThemePreference({ preference }),
         ],
-      ]
+      }
     },
 
     ChangedSystemTheme: ({ theme }) => {
@@ -251,13 +291,13 @@ export const update = (model: Model, message: Message) =>
         theme,
       )
 
-      return [
-        evo(model, {
+      return {
+        model: evo(model, {
           systemTheme: () => theme,
           resolvedTheme: () => resolvedTheme,
         }),
-        [ApplyTheme({ theme: resolvedTheme })],
-      ]
+        commands: [ApplyTheme({ theme: resolvedTheme })],
+      }
     },
 
     GotHomeMessage: ({ message }) => foldHome(model, message),

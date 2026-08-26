@@ -66,7 +66,7 @@ export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
     onNone: () => [],
     onSome: ({ songs }) => songs,
   })
-  const [home] = Home.init()
+  const homeInit = Home.init()
   const maybeCurrentSong = M.value(route).pipe(
     M.tag('SongEdit', ({ songId }) => Song.findById(songs, songId)),
     M.tag('SongPlay', ({ songId }) => Song.findById(songs, songId)),
@@ -76,27 +76,27 @@ export const init: Runtime.RoutingApplicationInit<Model, Message, Flags> = (
     maybeCurrentSong,
     () => Editor.placeholderSong,
   )
-  const [editor] = Editor.init(currentSong)
-  const [play] = Play.init(currentSong)
+  const editorInit = Editor.init(currentSong)
+  const playInit = Play.init(currentSong)
   const themePreference: ThemePreference = Option.getOrElse(
     flags.maybeThemePreference,
     () => 'System',
   )
   const resolvedTheme = resolveTheme(themePreference, flags.systemTheme)
 
-  return [
-    {
+  return {
+    model: {
       route,
       songs,
-      home,
-      editor,
-      play,
+      home: homeInit.model,
+      editor: editorInit.model,
+      play: playInit.model,
       toast: Toast.init({ id: 'app-toast' }),
       maybePendingEditSongId: Option.none(),
       maybeThemePreference: Option.some(themePreference),
       systemTheme: flags.systemTheme,
       resolvedTheme,
     },
-    [ApplyTheme({ theme: resolvedTheme })],
-  ]
+    commands: [ApplyTheme({ theme: resolvedTheme })],
+  }
 }

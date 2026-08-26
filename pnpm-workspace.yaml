@@ -2,8 +2,9 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: false
 minimumReleaseAgeExclude:
-  - '@foldkit/ui@0.149.0'
-  - foldkit@0.149.0
-  - '@foldkit/devtools@0.149.0'
-  - '@foldkit/oxlint-plugin@0.7.0'
-  - '@foldkit/vite-plugin@0.16.2'
+  - '@foldkit/ui@0.151.0'
+  - foldkit@0.151.0
+  - '@foldkit/devtools@0.151.0'
+  - '@foldkit/devtools-mcp@0.17.0'
+  - '@foldkit/oxlint-plugin@0.8.0'
+  - '@foldkit/vite-plugin@0.17.0'

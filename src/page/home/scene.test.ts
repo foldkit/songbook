@@ -6,7 +6,7 @@ import { init } from './model'
 import { update } from './update'
 import { view } from './view'
 
-const [home] = init()
+const homeInit = init()
 
 const untitled = Song.create('song-1', 'section-1')
 
@@ -14,7 +14,7 @@ describe('home view', () => {
   test('lists saved songs', () => {
     scene(
       { update, view: withViewInputs(view, { songs: [untitled] })() },
-      given(home),
+      given(homeInit.model),
       expect(role('heading', { name: 'Coverchart' })).toExist(),
       expect(role('link', { name: 'Untitled' })).toExist(),
       expect(role('link', { name: 'Edit' })).toExist(),

@@ -25,13 +25,13 @@ const song = Song.updateSection(baseSong, 'section-1', section =>
   }),
 )
 
-const [editorModel] = init(song)
+const editorInit = init(song)
 
 describe('editor', () => {
   test('updating the title emits the changed song', () => {
     story(
       update,
-      given(editorModel),
+      given(editorInit.model),
       message(Message.UpdatedTitle({ value: 'Blackbird' })),
       expectOutMessage(
         OutMessage.UpdatedSong({
@@ -49,7 +49,7 @@ describe('editor', () => {
 
     story(
       update,
-      given(editorModel),
+      given(editorInit.model),
       message(Message.ClickedEditLyrics({ sectionId: 'section-1' })),
       expectNoOutMessage(),
       message(Message.UpdatedLyricsDraft({ value: draft })),
@@ -63,7 +63,7 @@ describe('editor', () => {
   test('clicking a word starts placing a chord', () => {
     story(
       update,
-      given(editorModel),
+      given(editorInit.model),
       message(Message.ClickedWord({ lineId: 'line-1', at: 0 })),
       expectNoOutMessage(),
       Command.resolve(Menu.FocusItems, Menu.Message.CompletedFocusItems()),
@@ -77,7 +77,7 @@ describe('editor', () => {
   test('adding a song chord and tapping it places the mark', () => {
     story(
       update,
-      given(editorModel),
+      given(editorInit.model),
       message(Message.UpdatedPaletteDraft({ value: 'G' })),
       message(Message.SubmittedPaletteChord()),
       expectOutMessage(

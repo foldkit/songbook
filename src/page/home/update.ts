@@ -1,4 +1,4 @@
-import { Match as M, Option } from 'effect'
+import { Match as M, Option, pipe } from 'effect'
 import { Update } from 'foldkit'
 import { evo } from 'foldkit/struct'
 
@@ -23,11 +23,10 @@ const toGotDeleteDialogMessage = (message: Dialog.Message): Message =>
 const foldDeleteDialogOutMessage = M.type<Dialog.OutMessage>().pipe(
   M.withReturnType<Update.Step<Model, Message>>(),
   M.tagsExhaustive({
-    Opened: () => model => [model, []],
-    Closed: () => model => [
-      evo(model, { maybePendingDeleteSongId: () => Option.none() }),
-      [],
-    ],
+    Opened: () => model => ({ model }),
+    Closed: () => model => ({
+      model: evo(model, { maybePendingDeleteSongId: () => Option.none() }),
+    }),
   }),
 )
 
@@ -36,7 +35,6 @@ const foldDeleteDialog = Update.foldChild({
   read: readDeleteDialog,
   write: writeDeleteDialog,
   toParentMessage: toGotDeleteDialogMessage,
-  toParentOutMessage: () => Option.none(),
   foldOutMessage: foldDeleteDialogOutMessage,
 })
 
@@ -56,35 +54,34 @@ const foldDeleteDialogClose = Update.foldChildStep({
   foldOutMessage: foldDeleteDialogOutMessage,
 })
 
-export const update = (model: Model, message: Message): UpdateReturn =>
+export const update = (model: Model, message: Message) =>
   Message.match<UpdateReturn>(message, {
-    UpdatedSearchQuery: ({ value }) => [
-      evo(model, { searchQuery: () => value }),
-      [],
-      Option.none(),
-    ],
+    UpdatedSearchQuery: ({ value }) => ({
+      model: evo(model, { searchQuery: () => value }),
+    }),
 
-    ClickedNewSong: () => [
+    ClickedNewSong: () => ({
       model,
-      [],
-      Option.some(OutMessage.RequestedNewSong()),
-    ],
+      outMessage: OutMessage.RequestedNewSong(),
+    }),
 
-    ClickedDeleteSong: ({ songId }) => {
-      const [nextModel, commands] = foldDeleteDialogOpen(
+    ClickedDeleteSong: ({ songId }) =>
+      foldDeleteDialogOpen(
         evo(model, { maybePendingDeleteSongId: () => Option.some(songId) }),
-      )
-      return [nextModel, commands, Option.none()]
-    },
+      ),
 
     ClickedConfirmDelete: () => {
-      const maybeOut = Option.map(model.maybePendingDeleteSongId, songId =>
-        OutMessage.ConfirmedDeleteSong({ songId }),
-      )
-      const [nextModel, commands] = foldDeleteDialogClose(
+      const dialogClose = foldDeleteDialogClose(
         evo(model, { maybePendingDeleteSongId: () => Option.none() }),
       )
-      return [nextModel, commands, maybeOut]
+      return Option.match(model.maybePendingDeleteSongId, {
+        onNone: () => dialogClose,
+        onSome: songId =>
+          pipe(
+            dialogClose,
+            Update.withOutMessage(OutMessage.ConfirmedDeleteSong({ songId })),
+          ),
+      })
     },
 
     GotDeleteDialogMessage: ({ message }) => foldDeleteDialog(model, message),

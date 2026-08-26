@@ -29,11 +29,11 @@ const song = Song.updateSection(
     }),
 )
 
-const [editorModel] = init(song)
+const editorInit = init(song)
 
 describe('editor view', () => {
   test('clicking a lyric word then a song chord places it', () => {
-    const withPalette = evo(editorModel, {
+    const withPalette = evo(editorInit.model, {
       song: () => evo(song, { chords: () => ['G'] }),
     })
 
@@ -71,7 +71,7 @@ describe('editor view', () => {
   test('section reorder starts from the drag handle, not the card body', () => {
     scene(
       { update, view },
-      given(editorModel),
+      given(editorInit.model),
       expect(role('option', { name: 'Reorder Verse' })).toExist(),
       expect(role('option', { name: 'Reorder Verse' })).toHaveAttr(
         'aria-roledescription',

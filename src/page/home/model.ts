@@ -10,11 +10,10 @@ export const Model = S.Struct({
 
 export type Model = typeof Model.Type
 
-export const init = (): readonly [Model, ReadonlyArray<never>] => [
-  {
+export const init = () => ({
+  model: {
     searchQuery: '',
     deleteDialog: Dialog.init({ id: 'delete-song-dialog' }),
     maybePendingDeleteSongId: Option.none(),
   },
-  [],
-]
+})
